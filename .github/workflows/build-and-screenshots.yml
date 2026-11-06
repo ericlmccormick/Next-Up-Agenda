@@ -10,6 +10,11 @@ on:
 permissions:
   contents: write
 
+# Prevent older builds from overwriting the latest PBW and screenshot release assets.
+concurrency:
+  group: agenda-main-publish
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
