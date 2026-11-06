@@ -459,7 +459,7 @@ function queueSolarTimes(solar) {
 }
 function startWeatherPlugin() {
   if (typeof Pebble.subscribeToSource!=='function') {
-    console.log('Hybrid: Weather plugin API unavailable; Auto uses local clock fallback');
+    console.log('72hr Agenda: Weather plugin API unavailable; Auto uses local clock fallback');
     return;
   }
   if (weatherSubscription) return;
@@ -479,15 +479,15 @@ function startWeatherPlugin() {
           queueSolarTimes(solar);
         } else {
           // A missing forecast must not replace a previously valid same-day reading.
-          console.log('Hybrid: Weather plugin has no current-day solar times; clock fallback applies');
+          console.log('72hr Agenda: Weather plugin has no current-day solar times; clock fallback applies');
         }
       },
       onError:function(error) {
-        console.log('Hybrid: Optional Weather source unavailable: '+(error && error.message || error));
+        console.log('72hr Agenda: Optional Weather source unavailable: '+(error && error.message || error));
       }
     });
   } catch(err) {
-    console.log('Hybrid: Weather subscription unavailable; Auto uses clock fallback: '+err);
+    console.log('72hr Agenda: Weather subscription unavailable; Auto uses clock fallback: '+err);
   }
 }
 function restoreSolarTimes() {
@@ -725,7 +725,7 @@ function knownCalendarNames() {
     return Array.isArray(names)?names.slice(0,10):[];
   } catch(e) {return [];}
 }
-function buildHybridClayConfig() {
+function buildAgendaClayConfig() {
   var cfg=JSON.parse(JSON.stringify(clayConfig));
   var names=knownCalendarNames();
   if (!names.length) return cfg;
@@ -759,7 +759,7 @@ Pebble.addEventListener('showConfiguration', function() {
   names.forEach(function(name,i){
     prefs['PLUGIN_CALENDAR_COLOR_'+(i+1)]=String(colorForCalendar(name));
   });
-  clay=new Clay(buildHybridClayConfig(),null,{autoHandleEvents:false});
+  clay=new Clay(buildAgendaClayConfig(),null,{autoHandleEvents:false});
   clay.setSettings(prefs);
   Pebble.openURL(clay.generateUrl()); 
 });
