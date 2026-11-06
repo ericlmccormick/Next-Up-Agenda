@@ -65,6 +65,20 @@ jobs:
           else
             gh release create dev-latest next-up-agenda.pbw --prerelease --title "Next Up Agenda development build" --notes "Latest build from main, with native Calendar and optional Weather plugins." --target "$GITHUB_SHA"
           fi
+      - name: Create first stable release v1.0.0
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          tag="v$version"
+          # Stable releases are immutable; do not replace the first published PBW.
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" next-up-agenda.pbw \
+              --title "Next Up Agenda $tag" \
+              --notes-file RELEASE_NOTES.md \
+              --target "$GITHUB_SHA"
+          fi
 
   screenshots:
     needs: build
@@ -113,6 +127,17 @@ jobs:
             sleep 5
           done
           gh release upload dev-latest screenshots/*.png --clobber
+          # Attach the screenshots to the immutable first stable release.
+          version="$(node -p 'require("./package.json").version')"
+          tag="v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            for image in screenshots/*.png; do
+              asset="$(basename "$image")"
+              if ! gh release view "$tag" --json assets --jq '.assets[].name' | grep -Fxq "$asset"; then
+                gh release upload "$tag" "$image"
+              fi
+            done
+          fi
           # Remove pre-rename assets from the development release.
           for platform in aplite basalt chalk diorite emery; do
             for prefix in 3day-agenda 72hr-agenda; do

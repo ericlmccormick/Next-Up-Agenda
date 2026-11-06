@@ -16,7 +16,7 @@ A quick-glance calendar and daily weather agenda for Pebble watches. Calendar ev
 
 ## Setup
 
-1. Install [next-up-agenda.pbw](https://github.com/ericlmccormick/Next-Up-Agenda/releases/download/dev-latest/next-up-agenda.pbw) and enable the **Calendar** plugin in the Pebble mobile app.
+1. Install [next-up-agenda.pbw](https://github.com/ericlmccormick/Next-Up-Agenda/releases/download/v1.0.0/next-up-agenda.pbw) and enable the **Calendar** plugin in the Pebble mobile app.
 2. Allow calendar access and choose which device calendars the plugin can read.
 3. Enable the **Weather** plugin if you want daily high/low temperatures, condition icons, or sunrise/sunset theme switching.
 4. Open the app's phone settings to choose default/per-calendar colors and display preferences. Long-press Select on the watch for Force Sync and watch-side settings.
@@ -35,7 +35,7 @@ Builds target all five Pebble SDK platforms: Aplite (Pebble and Steel), Basalt (
 
 ## Automated builds and screenshots
 
-The GitHub Actions workflow runs JavaScript regression tests and compiles a direct-download PBW for all five platforms. Emulator screenshots for all five platforms are published as separate PNG assets in the same [development release](https://github.com/ericlmccormick/Next-Up-Agenda/releases/tag/dev-latest). Screenshot fixtures use synthetic events and weather, never personal calendar contents.
+The GitHub Actions workflow runs JavaScript regression tests and compiles a direct-download PBW for all five platforms. Emulator screenshots for all five platforms are published as separate PNG assets in the same [v1.0.0 release](https://github.com/ericlmccormick/Next-Up-Agenda/releases/tag/v1.0.0). Screenshot fixtures use synthetic events and weather, never personal calendar contents.
 
 ## Privacy and support
 
