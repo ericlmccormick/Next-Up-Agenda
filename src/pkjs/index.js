@@ -21,7 +21,7 @@ var detailCacheRestored = false;
 var lastWatchTransferAt = 0;
 // Duplicate sync triggers during an active fetch are ignored.
 // Pebble 'ready' and the watch's initial sync ping often overlap.
-// How many bytes a single CalendarEvent struct takes up in C (8 bytes for time + 56 bytes for title = 64)
+// Wire format: 8 bytes of timestamps, 56 bytes of title, 1 color/flag byte.
 var BYTES_PER_EVENT = 65; 
 // Use the last successful plugin synchronization for a short watch reconnect cache.
 var CACHE_MINUTES = 30;
@@ -103,8 +103,6 @@ function encodeTitleUtf8(title, bytes, startOffset) {
 var pluginSubscription=null;
 var pluginEvents=[];
 var pluginState='pending';
-var pluginRevision=0;
-var lastPluginCalendarNames=[];
 var lastCombinedSignature='';
 var combineTimer=null;
 var pluginStartupTimer=null;
@@ -131,8 +129,8 @@ function updateCalendarNames(events) {
       .forEach(function(name){if(name) known[String(name)]=true;});
   } catch(e){}
   events.forEach(function(ev){if(ev.calendarName) known[ev.calendarName]=true;});
-  lastPluginCalendarNames=Object.keys(known).sort().slice(0,10);
-  localStorage.setItem('hybrid_calendar_names',JSON.stringify(lastPluginCalendarNames));
+  try {localStorage.setItem('hybrid_calendar_names',JSON.stringify(Object.keys(known).sort().slice(0,10)));}
+  catch(e) { console.log('Agenda: Could not save calendar names'); }
 }
 function sameTitle(event) {
   return String(event.title || '').trim().replace(/\s+/g,' ').toLocaleLowerCase();
@@ -155,8 +153,7 @@ function normalizeAllDayEvent(ev) {
   if (!isFinite(start) || start<=0) return ev;
   var shiftedStart=localMidnightForDateOnly(start);
   var shiftedEnd=isFinite(end) && end>0 ? localMidnightForDateOnly(end) : NaN;
-  // The ICS spec uses an exclusive end date for full-day appointments.
-  // Some feeds omit it, or supply start==end. Treat that as one local day.
+  // All-day end dates are exclusive. If missing, use the next local midnight.
   if (!isFinite(shiftedEnd) || shiftedEnd<=shiftedStart) {
     var d=new Date(shiftedStart);
     shiftedEnd=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1).getTime();
@@ -173,15 +170,16 @@ function normalizeEventWindow(events) {
       isFinite(end) && end>=now && end>=start;
   });
 }
-function dedupeByTitle(events) {
-  // Exactly as requested: two entries with the same normalized title,
-  // even if on different dates, become ONE event. Earliest wins.
-  var seen={},result=[];
+function dedupeEvents(events) {
+  // The same title on different dates or times is not a duplicate.
+  // Different calendars can contain distinct appointments at the same time.
+  // Only collapse exact same-calendar, same-start, same-title instances.
+  var seen=Object.create(null),result=[];
   events.sort(function(a,b){return Number(a.timestampMs)-Number(b.timestampMs) ||
-    (a.fromPlugin===b.fromPlugin?0:a.fromPlugin?-1:1);});
+    String(a.calendarName||'').localeCompare(String(b.calendarName||''));});
   events.forEach(function(ev) {
-    var key=sameTitle(ev);
-    if (!key || Object.prototype.hasOwnProperty.call(seen,key)) return;
+    var key=JSON.stringify([sameTitle(ev),Number(ev.timestampMs),String(ev.calendarName||'')]);
+    if (seen[key]) return;
     seen[key]=true;
     result.push(ev);
   });
@@ -246,14 +244,14 @@ function pushCombinedCalendar(force) {
   // An unavailable plugin must never replace the last valid watch agenda.
   // A valid empty plugin response, however, must clear outdated appointments.
   if (pluginState!=='ready') return;
-  var selected=dedupeByTitle(normalizeEventWindow(pluginEvents.slice()));
+  var selected=dedupeEvents(normalizeEventWindow(pluginEvents.slice()));
   var watchInfo=Pebble.getActiveWatchInfo?Pebble.getActiveWatchInfo():null;
   var count=watchInfo && watchInfo.platform==='aplite'?20:MAX_EVENTS;
   selected=selected.slice(0,count);
   var sig=JSON.stringify(selected);
   if (!force && sig===lastCombinedSignature) return;
   syncBusy=true;
-  sendEventByteArray(selected,0,function(ok) {
+  sendEventByteArray(selected,function(ok) {
     syncBusy=false;
     if (syncAfterCurrent) { syncAfterCurrent=false; scheduleCombinedSync(); }
     if(ok) {
@@ -263,16 +261,20 @@ function pushCombinedCalendar(force) {
       detailCacheRestored=true;
       lastWatchTransferAt=Date.now();
       localStorage.setItem('last_fetch_time',String(Date.now()));
-      console.log('Agenda: Synced '+selected.length+' unique event titles');
+      console.log('Agenda: Synced '+selected.length+' distinct appointments');
     } else {
       Pebble.sendAppMessage({SYNC_STATUS:'error'},function(){},function(){});
     }
   });
 }
+function notifyCalendarUnavailable() {
+  Pebble.sendAppMessage({SYNC_STATUS:'error'},function(){},function(){});
+}
 function startPluginCalendar() {
   if (typeof Pebble.subscribeToSource!=='function') {
     pluginState='failed';
     console.log('Agenda: Calendar plugin unavailable. Enable the Calendar plugin and grant calendar access in Pebble mobile Settings.');
+    notifyCalendarUnavailable();
     return;
   }
   if(pluginSubscription) return;
@@ -283,7 +285,7 @@ function startPluginCalendar() {
       if(pluginState==='pending') {
         console.log('Agenda: Calendar plugin did not respond; preserving the last synchronized agenda');
         pluginState='failed';
-        scheduleCombinedSync();
+        notifyCalendarUnavailable();
       }
     },12000);
     pluginSubscription=Pebble.subscribeToSource({
@@ -292,13 +294,12 @@ function startPluginCalendar() {
         pluginEvents=normalizePluginEnvelope(envelope);
         updateCalendarNames(pluginEvents);
         pluginState='ready';
-        pluginRevision++;
         if (pluginStartupTimer) { clearTimeout(pluginStartupTimer);pluginStartupTimer=null; }
         scheduleCombinedSync();
       },
       onError:function(error) {
         console.log('Agenda: calendar/event error: '+(error && error.code)+' '+(error && error.message));
-        if(pluginState==='pending') pluginState='failed';
+        if(pluginState==='pending') { pluginState='failed'; notifyCalendarUnavailable(); }
         if(pluginStartupTimer) { clearTimeout(pluginStartupTimer);pluginStartupTimer=null; }
         scheduleCombinedSync();
       }
@@ -306,6 +307,7 @@ function startPluginCalendar() {
   } catch(err) {
     pluginState='failed';
     console.log('Agenda: Could not subscribe to native calendar: '+err);
+    notifyCalendarUnavailable();
   }
 }
 // Daily forecast series published by the native weather/location source.
@@ -582,7 +584,7 @@ function sendChunk(transfer) {
       retryChunk(transfer,'AppMessage send failed');
   });
 }
-function sendEventByteArray(events, start, done) {
+function sendEventByteArray(events, done) {
   if (activeTransfer) { done(false); return; }
   var packets=[];
   if (!events.length) packets.push([]);
@@ -632,8 +634,6 @@ function detailText(event) {
   add('Description', event.description, 180);
   add('Organizer', event.organizer, 60);
   add('Link', event.url, 100);
-  add('Status', event.status, 20);
-  add('Category', Array.isArray(event.categories) ? event.categories.join(', ') : event.categories, 40);
   var value = out.join('\n\n') || 'No additional details';
   // Limit by UTF-8 bytes to stay within Pebble's AppMessage inbox.
   var result = '', length = 0;
@@ -708,7 +708,9 @@ Pebble.addEventListener('appmessage', function(e) {
   } else if (payload.SYNC_COMMAND === 'sync') {
     if (activeTransfer || syncBusy) return;
     if (cacheIsFresh() && detailCacheRestored && Date.now()-lastWatchTransferAt>10000) {
-      sendEventByteArray(latestEvents,0,function(ok) {
+      // A fresh plugin response supersedes the persisted cache immediately.
+      if (pluginState==='ready') scheduleCombinedSync();
+      else sendEventByteArray(latestEvents,function(ok) {
         if(ok) lastWatchTransferAt=Date.now();
       });
     } else if (!detailCacheRestored) {
