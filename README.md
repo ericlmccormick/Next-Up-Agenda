@@ -13,6 +13,7 @@ A quick-glance calendar and daily weather agenda for Pebble watches. Calendar ev
 - AppGlance next-event summary, last successful synchronization, Force Sync, and optional filtering of completed cached events
 - Offline cached events and weather, with acknowledged/retried AppMessage transfers
 - Starts at the first visible appointment whenever the watch app opens
+- Custom black-and-white 25 × 25 launcher icon with transparency on supported watch models
 
 ## Setup
 

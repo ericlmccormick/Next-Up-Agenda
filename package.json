@@ -52,7 +52,14 @@
     ],
     "projectType": "native",
     "resources": {
-      "media": []
+      "media": [
+        {
+          "type": "bitmap",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/menu-icon-25.png",
+          "menuIcon": true
+        }
+      ]
     },
     "sdkVersion": "3",
     "targetPlatforms": [
