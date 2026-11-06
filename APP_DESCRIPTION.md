@@ -4,7 +4,7 @@
 
 See upcoming appointments alongside daily weather forecasts in a clean, glanceable Pebble agenda. Events come straight from the native Pebble Calendar plugin—no calendar URLs, separate accounts, or API keys to configure.
 
-**Calendar at a glance:** View appointments from the calendars you select in the Pebble mobile app. Color-code each discovered calendar and open an event to view available details. All-day events are displayed as all-day rather than misleading start times.
+**Calendar at a glance:** View appointments from the calendars you select in the Pebble mobile app. Color-code each discovered calendar and open an event to view available details. All-day events display correctly, and repeated appointments on different days are preserved.
 
 **Daily weather:** The native Weather plugin supplies clear condition icons and daily high/low temperatures in each date header, without a separate weather service or API key.
 

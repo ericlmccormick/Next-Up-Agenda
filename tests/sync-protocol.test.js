@@ -46,4 +46,9 @@ ack(id,0);assert.equal(data.last_fetch_time,undefined,'duplicate ACK ignored');
 ack(id,1);
 assert(data.last_fetch_time,'committed after final ACK');
 assert.equal(JSON.parse(data.detail_cache_events).length,3);
+// Watch has lost its stored event list but the plugin data is unchanged.
+// A new watch request must resend events despite an identical signature.
+handlers.appmessage({payload:{SYNC_COMMAND:'sync'}});
+assert.equal(sent.length,4,'explicit watch resync sends unchanged calendar');
+assert.notEqual(sent[3].SYNC_ID,id,'resync uses a new transaction');
 console.log('Calendar plugin transactional ACK/retry regression tests passed');

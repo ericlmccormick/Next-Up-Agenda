@@ -8,7 +8,7 @@ A quick-glance calendar and daily weather agenda for Pebble watches. Calendar ev
 - Native Weather plugin: weather glyph and high/low temperatures in the agenda's date headers
 - Automatic light/dark theme based on today's sunrise and sunset; 7 AM–7 PM fallback if solar data is unavailable
 - Color choices for each discovered calendar and a default calendar color
-- All-day event support, duplicate-title removal, 12/24-hour time, compact event rows and adjustable text size
+- All-day event support, duplicate-event filtering that preserves recurring appointments, 12/24-hour time, compact event rows and adjustable text size
 - Scrollable appointment details when provided by the Calendar plugin
 - AppGlance next-event summary, last successful synchronization, Force Sync, and optional past-event visibility
 - Offline cached events and weather, with acknowledged/retried AppMessage transfers
@@ -27,7 +27,7 @@ Without Calendar plugin data, the watch preserves its last valid agenda instead 
 
 The native Calendar plugin currently returns **up to 10 upcoming events** within seven days; the amount of calendar time represented depends on event density. The agenda follows the native plugin output rather than enforcing a fixed number of hours or days. No additional calendar events are fetched from other sources.
 
-The current app deduplicates titles **case-insensitively even if the appointments occur on different days**, keeping the earliest event. Repeated appointments sharing a title may therefore be collapsed.
+The app removes only matching appointments with the same calendar, normalized title, start/end timestamps and location. Recurring meetings on different days, or distinct simultaneous meetings, remain visible. The Calendar plugin's own event limit still applies.
 
 ## Supported platforms
 
