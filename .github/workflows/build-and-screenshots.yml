@@ -46,6 +46,17 @@ jobs:
           pebble build
           test "$(find build -type f -name '*.pbw' | wc -l)" -eq 1
           cp "$(find build -type f -name '*.pbw' | head -1)" next-up-agenda.pbw
+          # The phone treats manifestVersion < 2 as a legacy app, ignoring
+          # usesPermissions and retaining obsolete Internet permissions.
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("build/appinfo.json").read_text())
+          assert data["manifestVersion"] == 2, "PBW needs manifestVersion: 2"
+          declared = data.get("usesPermissions", [])
+          assert set(declared) == {"Calendar", "Location"}, declared
+          print("Verified modern permission manifest:", declared)
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: next-up-agenda-pbw
@@ -72,12 +83,15 @@ jobs:
         run: |
           version="$(node -p 'require("./package.json").version')"
           tag="v$version"
-          # Stable releases are immutable; do not replace the first published PBW.
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" next-up-agenda.pbw \
               --title "Next Up Agenda $tag" \
               --notes-file RELEASE_NOTES.md \
               --target "$GITHUB_SHA"
+          elif [ "$tag" = "v1.0.0" ]; then
+            # This first version has not been submitted to the Appstore yet.
+            # Update its staged PBW with the corrected permissions and icon.
+            gh release upload "$tag" next-up-agenda.pbw --clobber
           fi
 
   screenshots:
