@@ -7,7 +7,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const src=fs.readFileSync('src/pkjs/index.js','utf8');
 const begin=src.indexOf('function localMidnightForDateOnly(');
-const end=src.indexOf('function dedupeByTitle(',begin);
+const end=src.indexOf('function dedupeEvents(',begin);
 assert(begin>0 && end>begin);
 const context={Date,console};
 vm.createContext(context);
