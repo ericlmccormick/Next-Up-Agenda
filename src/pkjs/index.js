@@ -173,12 +173,12 @@ function normalizeEventWindow(events) {
 function dedupeEvents(events) {
   // The same title on different dates or times is not a duplicate.
   // Different calendars can contain distinct appointments at the same time.
-  // Only collapse exact same-calendar, same-start, same-title instances.
+  // Only collapse events with the same calendar, title, start/end and location.
   var seen=Object.create(null),result=[];
   events.sort(function(a,b){return Number(a.timestampMs)-Number(b.timestampMs) ||
     String(a.calendarName||'').localeCompare(String(b.calendarName||''));});
   events.forEach(function(ev) {
-    var key=JSON.stringify([sameTitle(ev),Number(ev.timestampMs),String(ev.calendarName||'')]);
+    var key=JSON.stringify([sameTitle(ev),Number(ev.timestampMs),Number(ev.endTimestampMs||ev.timestampMs),String(ev.calendarName||''),String(ev.location||'')]);
     if (seen[key]) return;
     seen[key]=true;
     result.push(ev);
@@ -225,8 +225,7 @@ function normalizePluginEnvelope(envelope) {
       organizer:String(propertyValue(p,['organizer'])||''),
       isAllDay:!!propertyValue(p,['all_day','allDay','isAllDay']),
       calendarName:calendarName,
-      calendarColor:colorForCalendar(calendarName),fromPlugin:true,
-      uid:String(instance.instanceId||'')
+      calendarColor:colorForCalendar(calendarName)
     });
   });
   if (envelope.instances.length && !entries.length) {
@@ -334,7 +333,7 @@ function weatherSeries(properties,name,shape) {
   if (!series || Number(series.stepSec)!==86400) return null;
   var values=series[shape] && series[shape].values;
   if (!Array.isArray(values) || !isFinite(Number(series.start))) return null;
-  return {start:Number(series.start),values:values,unit:series.numericValue && series.numericValue.unit};
+  return {start:Number(series.start),values:values};
 }
 function forecastFromEnvelope(envelope) {
   var instances=envelope && Array.isArray(envelope.instances)?envelope.instances:[];
