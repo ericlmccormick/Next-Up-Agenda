@@ -111,6 +111,7 @@ var lastCombinedSignature='';
 var combineTimer=null;
 var pluginStartupTimer=null;
 var syncAfterCurrent=false;
+var forceNextPluginSync=false;
 function pluginColor() {
   var n=Number(localStorage.getItem('hybrid_plugin_color') || '4');
   return n>=1 && n<=6 ? n : 4;
@@ -253,12 +254,13 @@ function pushCombinedCalendar(force) {
   var count=watchInfo && watchInfo.platform==='aplite'?20:MAX_EVENTS;
   selected=selected.slice(0,count);
   var sig=JSON.stringify(selected);
-  if (!force && sig===lastCombinedSignature) return;
+  if (!force && !forceNextPluginSync && sig===lastCombinedSignature) return;
   syncBusy=true;
   sendEventByteArray(selected,function(ok) {
     syncBusy=false;
     if (syncAfterCurrent) { syncAfterCurrent=false; scheduleCombinedSync(); }
     if(ok) {
+      forceNextPluginSync=false;
       latestEvents=selected;
       lastCombinedSignature=sig;
       persistDetailCache(selected);
@@ -713,6 +715,7 @@ Pebble.addEventListener('appmessage', function(e) {
   }
   if (payload.SYNC_COMMAND === 'refresh') {
     console.log('Agenda: Manual refresh');
+    forceNextPluginSync=true;
     lastSolarSent='';
     forecastLastSent='';
     restoreSolarTimes();
