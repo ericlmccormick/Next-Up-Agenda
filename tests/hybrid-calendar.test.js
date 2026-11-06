@@ -55,13 +55,24 @@ function scenario(previousIcs) {
     starts_at:{timestamp:{value:Math.floor((now+7200000)/1000)}},
     ends_at:{timestamp:{value:Math.floor((now+9000000)/1000)}},
     calendar:{shortText:{text:'Work'}}}},
+  // Recurring title on another day must remain visible.
   {instanceId:'c',properties:{name:{shortText:{text:' Plugin Only '}},
     starts_at:{timestamp:{value:Math.floor((now+86400000)/1000)}},
+    calendar:{shortText:{text:'Work'}}}},
+  // Exact copy of the same Work event should be collapsed.
+  {instanceId:'duplicate',properties:{name:{shortText:{text:' plugin only '}},
+    starts_at:{timestamp:{value:Math.floor((now+7200000)/1000)}},
+    calendar:{shortText:{text:'Work'}}}},
+  // Same title/time on a different calendar is a distinct appointment.
+  {instanceId:'other-calendar',properties:{name:{shortText:{text:'Shared'}},
+    starts_at:{timestamp:{value:Math.floor((now+1800000)/1000)}},
     calendar:{shortText:{text:'Work'}}}}
  ];
  subs[0].onData({instances});fire(750);
  const events=JSON.parse(data.detail_cache_events);
- assert.equal(events.length,2,'duplicate title filtering preserved');
+ assert.equal(events.length,4,'recurrences and different calendars preserved; exact duplicate removed');
+ assert.equal(events.filter(x=>x.title.trim().toLowerCase()==='plugin only').length,2,'same-title events on different days both remain');
+ assert.equal(events.filter(x=>x.title.trim().toLowerCase()==='shared').length,2,'same-time events on different calendars both remain');
  assert(!events.some(x=>x.title==='Obsolete ICS'),'old ICS data not reused');
  assert(events.some(x=>x.location==='Test room'),'native location retained');
  assert.equal(events.find(x=>x.calendarName==='Personal').calendarColor,previousIcs?2:4);
@@ -77,4 +88,4 @@ function scenario(previousIcs) {
 }
 scenario(false);
 scenario(true);
-console.log('Native Calendar-only integration, migration, dedup and empty state passed');
+console.log('Native Calendar-only integration, recurrence preservation, dedup, migration and empty-state tests passed');
