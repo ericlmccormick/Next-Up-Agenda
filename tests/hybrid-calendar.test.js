@@ -62,6 +62,7 @@ function scenario(previousIcs) {
   // Exact copy of the same Work event should be collapsed.
   {instanceId:'duplicate',properties:{name:{shortText:{text:' plugin only '}},
     starts_at:{timestamp:{value:Math.floor((now+7200000)/1000)}},
+    ends_at:{timestamp:{value:Math.floor((now+9000000)/1000)}},
     calendar:{shortText:{text:'Work'}}}},
   // Same title/time on a different calendar is a distinct appointment.
   {instanceId:'other-calendar',properties:{name:{shortText:{text:'Shared'}},
