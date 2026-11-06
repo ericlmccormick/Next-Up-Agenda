@@ -9,7 +9,6 @@
 #define MAX_EVENTS 48
 #define STORAGE_VERSION 3
 #define PERSIST_KEY_VERSION 99
-#define PERSIST_KEY_SELECTION 98
 #define PERSIST_KEY_FONT_SIZE 97
 // Define the maximum number of distinct day groups (e.g., Today, Tomorrow)
 #define MAX_SECTIONS 16
@@ -73,7 +72,7 @@ static Window *s_detail_window = NULL;  // The window that pops up to show event
 static MenuLayer *s_menu_layer;
 static Window *s_settings_window;
 static MenuLayer *s_settings_menu;
-static StatusBarLayer *s_detail_status_bar;         // The scrolling list layer for the main window
+static StatusBarLayer *s_detail_status_bar;
 static ScrollLayer *s_detail_scroll_layer;
 static TextLayer *s_detail_title_layer; // The text layer showing the event title in the detail window
 static TextLayer *s_detail_time_layer;
@@ -81,7 +80,7 @@ static TextLayer *s_detail_meta_layer;
 static char s_detail_meta[360] = "Loading details...";
 static char s_detail_title_copy[MAX_TITLE_LEN];
 static AppTimer *s_detail_timeout=NULL;
-static int32_t s_detail_request_token=0;  // The text layer showing the event time in the detail window
+static int32_t s_detail_request_token=0;
 static TextLayer *s_toast_layer;        // The notification layer for the "Syncing..." status
 
 // --- Global Data Variables ---
@@ -113,7 +112,7 @@ static uint32_t s_ack_id = 0;
 static int s_ack_attempts = 0;
 static AppTimer *s_ack_timer = NULL;
 static AppTimer *s_sync_watchdog = NULL;
-static AppTimer *s_pref_timer = NULL;// Array holding the grouping data for the Menu headers
+static AppTimer *s_pref_timer = NULL;
 
 // --- Helper Functions ---
 // Muted source markers; monochrome watches use black bars.
@@ -288,10 +287,12 @@ static void refresh_glance(void) {
 
 // Saves the event array into the watch's permanent memory in small chunks
 static void save_data_to_storage() {
-  persist_write_int(PERSIST_KEY_VERSION, STORAGE_VERSION);
-  persist_write_int(PERSIST_KEY_COUNT, s_total_expected_events); // Save the total number of events
+  // Invalidate the persisted snapshot before writing the next generation.
+  // Otherwise a restart may load mixed old and new event records.
+  persist_delete(PERSIST_KEY_VERSION);
+  if (persist_write_int(PERSIST_KEY_COUNT, s_total_expected_events) != (int)sizeof(int)) return;
   
-  // Loop through the array, jumping forward by CHUNK_SIZE (4) each time
+  // Write at most two 65-byte records per persistent-storage key.
   for (int i = 0; i < s_total_expected_events; i += CHUNK_SIZE) {
     int remaining = s_total_expected_events - i; // Calculate how many events are left
     int to_save = (remaining < CHUNK_SIZE) ? remaining : CHUNK_SIZE; // Determine if we save a full chunk of 4, or a partial chunk
@@ -302,6 +303,8 @@ static void save_data_to_storage() {
       return;
     }
   }
+  // Commit marker comes last: a partial write cannot be treated as valid.
+  persist_write_int(PERSIST_KEY_VERSION, STORAGE_VERSION);
 }
 
 // Loads the event array from the watch's permanent memory
@@ -561,7 +564,6 @@ static void draw_row_callback(GContext* ctx, const Layer *l, MenuIndex *i, void 
 static void select_click_callback(MenuLayer *m, MenuIndex *i, void *d) { 
   if(s_num_sections > 0) { // If actual data exists
     s_restore_event_index = s_visible_indices[s_sections[i->section].start_index + i->row];
-    persist_write_int(PERSIST_KEY_SELECTION, s_restore_event_index);
     show_detail(s_visible_indices[s_sections[i->section].start_index + i->row]); // Open the detail window for that specific event
   }
 }
@@ -605,8 +607,10 @@ static void apply_main_theme(void) {
 static void sync_watchdog(void *context) {
   s_sync_watchdog=NULL;
   if (s_sync_in_progress && s_toast_layer) {
+    s_sync_in_progress=false;
     text_layer_set_text(s_toast_layer, "Sync delayed (cached)");
     layer_set_hidden(text_layer_get_layer(s_toast_layer), false);
+    if (s_menu_layer) menu_layer_reload_data(s_menu_layer);
   }
 }
 static void request_calendar_sync(bool force) {
@@ -1064,9 +1068,6 @@ static void init() {
     if(persist_read_data(PERSIST_KEY_WEATHER,s_forecast,forecast_size)==forecast_size)
       s_forecast_count=forecast_size/FORECAST_RECORD_SIZE;
   }
-  // Load user preference for 12/24 hour time
-  // Clock preferences are now controlled through s_time_mode.
-  
   // Load cached calendar data from permanent storage
   if (persist_exists(PERSIST_KEY_COUNT)) load_data_from_storage();
   
