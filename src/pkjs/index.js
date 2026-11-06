@@ -101,6 +101,7 @@ function encodeTitleUtf8(title, bytes, startOffset) {
 
 // Native Pebble Calendar plugin is the sole source of calendar events.
 var pluginSubscription=null;
+var pluginGeneration=0;
 var pluginEvents=[];
 var pluginState='pending';
 var lastCombinedSignature='';
@@ -278,6 +279,7 @@ function startPluginCalendar() {
   }
   if(pluginSubscription) return;
   pluginState='pending';
+  var generation=++pluginGeneration;
   try {
     pluginStartupTimer=setTimeout(function(){
       pluginStartupTimer=null;
@@ -290,6 +292,7 @@ function startPluginCalendar() {
     pluginSubscription=Pebble.subscribeToSource({
       category:'calendar',item:'event',
       onData:function(envelope) {
+        if (generation!==pluginGeneration) return; // Ignore an unsubscribed source's late response.
         pluginEvents=normalizePluginEnvelope(envelope);
         updateCalendarNames(pluginEvents);
         pluginState='ready';
@@ -297,6 +300,7 @@ function startPluginCalendar() {
         scheduleCombinedSync();
       },
       onError:function(error) {
+        if (generation!==pluginGeneration) return;
         console.log('Agenda: calendar/event error: '+(error && error.code)+' '+(error && error.message));
         if(pluginState==='pending') { pluginState='failed'; notifyCalendarUnavailable(); }
         if(pluginStartupTimer) { clearTimeout(pluginStartupTimer);pluginStartupTimer=null; }
@@ -500,6 +504,7 @@ function restoreSolarTimes() {
 }
 
 function stopPluginCalendar() {
+  ++pluginGeneration; // Invalidates callbacks already queued by the old subscription.
   if(pluginStartupTimer) { clearTimeout(pluginStartupTimer);pluginStartupTimer=null; }
   if(pluginSubscription && pluginSubscription.unsubscribe) pluginSubscription.unsubscribe();
   pluginSubscription=null;pluginState='disabled';pluginEvents=[];
@@ -706,15 +711,17 @@ Pebble.addEventListener('appmessage', function(e) {
     startPluginCalendar();
   } else if (payload.SYNC_COMMAND === 'sync') {
     if (activeTransfer || syncBusy) return;
-    if (cacheIsFresh() && detailCacheRestored && Date.now()-lastWatchTransferAt>10000) {
-      // A fresh plugin response supersedes the persisted cache immediately.
-      if (pluginState==='ready') scheduleCombinedSync();
-      else sendEventByteArray(latestEvents,function(ok) {
+    // The watch explicitly needs an event list (possibly after clearing its
+    // storage). A matching signature must not suppress this transfer.
+    if (pluginState==='ready') {
+      pushCombinedCalendar(true);
+    } else if (cacheIsFresh() && detailCacheRestored &&
+               Date.now()-lastWatchTransferAt>10000) {
+      sendEventByteArray(latestEvents,function(ok) {
         if(ok) lastWatchTransferAt=Date.now();
       });
     } else if (!detailCacheRestored) {
       startPluginCalendar();
-      if (pluginState==='ready') scheduleCombinedSync();
     }
   }
 });
