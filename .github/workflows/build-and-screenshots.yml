@@ -76,11 +76,15 @@ jobs:
       - name: Capture all supported watch screens
         shell: bash
         run: |
+          # Generate the numeric message-key mapping for reproducible demo data.
+          pebble build
           mkdir -p screenshots
           for platform in aplite basalt chalk diorite emery; do
             echo "::group::Screenshot $platform"
             timeout 150 pebble install 3day-agenda.pbw --emulator "$platform" --vnc
-            sleep 3
+            sleep 2
+            python3 tools/screenshot_fixture.py --platform "$platform"
+            sleep 2
             timeout 60 pebble screenshot --no-open --emulator "$platform" --vnc "screenshots/3day-agenda-$platform.png"
             test -s "screenshots/3day-agenda-$platform.png"
             echo "::endgroup::"
