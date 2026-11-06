@@ -68,7 +68,7 @@ jobs:
       - name: Install Pebble emulator
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpng-dev libgl1 libegl1 libpulse0
+          sudo apt-get install -y libpng-dev libgl1 libegl1 libpulse0 libsdl2-2.0-0 libpixman-1-0 libfreetype6
           python3 -m pip install --user --break-system-packages uv
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           ~/.local/bin/uv tool install --python 3.12 pebble-tool
