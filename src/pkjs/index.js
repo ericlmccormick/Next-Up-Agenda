@@ -34,7 +34,10 @@ function restoreDetailCache() {
   if (localStorage.getItem('detail_cache_sources') !== sourceSignature()) return false;
   try {
     var restored = JSON.parse(localStorage.getItem('detail_cache_events') || 'null');
-    if (!Array.isArray(restored)) return false;
+    if (!Array.isArray(restored) || !restored.every(function(ev) {
+      return ev && typeof ev.title==='string' && isFinite(Number(ev.timestampMs)) &&
+        Number(ev.timestampMs)>0 && isFinite(Number(ev.endTimestampMs));
+    })) return false;
     latestEvents = restored.slice(0, MAX_EVENTS);
     return true;
   } catch (err) { return false; }
@@ -47,7 +50,7 @@ function persistDetailCache(events) {
 }
 function cacheIsFresh() {
   var stamp = Number(localStorage.getItem('last_fetch_time'));
-  return stamp > 0 && Date.now() - stamp < CACHE_MINUTES * 60000;
+  return stamp > 0 && stamp <= Date.now() && Date.now() - stamp < CACHE_MINUTES * 60000;
 }
 
 
@@ -124,7 +127,7 @@ function colorForCalendar(name) {
   return color>=1 && color<=6?color:pluginColor();
 }
 function updateCalendarNames(events) {
-  var known={};
+  var known=Object.create(null);
   try {
     (JSON.parse(localStorage.getItem('hybrid_calendar_names')||'[]')||[])
       .forEach(function(name){if(name) known[String(name)]=true;});
@@ -232,6 +235,7 @@ function normalizePluginEnvelope(envelope) {
   if (envelope.instances.length && !entries.length) {
     var example=envelope.instances[0].properties||{};
     console.log('Agenda: Calendar plugin fields not recognized: '+Object.keys(example).join(', '));
+    return null; // Schema mismatch is not an authoritative empty calendar.
   }
   return normalizeEventWindow(entries);
 }
@@ -293,7 +297,13 @@ function startPluginCalendar() {
       category:'calendar',item:'event',
       onData:function(envelope) {
         if (generation!==pluginGeneration) return; // Ignore an unsubscribed source's late response.
-        pluginEvents=normalizePluginEnvelope(envelope);
+        if (!envelope || !Array.isArray(envelope.instances)) {
+          console.log('Agenda: Ignoring incomplete Calendar plugin envelope');
+          return;
+        }
+        var parsed=normalizePluginEnvelope(envelope);
+        if (parsed===null) return; // Preserve the last good agenda on schema errors.
+        pluginEvents=parsed;
         updateCalendarNames(pluginEvents);
         pluginState='ready';
         if (pluginStartupTimer) { clearTimeout(pluginStartupTimer);pluginStartupTimer=null; }
