@@ -89,7 +89,8 @@ static CalendarEvent *s_new_data_buffer = NULL; // Pointer to the memory holding
 static int s_total_expected_events = 0;         // The total number of events the phone says it will send
 static int s_events_received_so_far = 0;
 static int s_next_chunk = 0;
-static bool s_sync_in_progress = false;        // Counter tracking how many events have successfully arrived
+static bool s_sync_in_progress = false;
+static bool s_calendar_error = false;
 static int s_num_sections = 0;                  // How many unique day headers we currently have
 static int s_selected_event_index = 0;
 static int s_restore_event_index = 0;
@@ -115,7 +116,8 @@ static AppTimer *s_sync_watchdog = NULL;
 static AppTimer *s_pref_timer = NULL;
 
 // --- Helper Functions ---
-// Muted source markers; monochrome watches use black bars.
+// On monochrome watches the color strip must contrast with either theme.
+static bool dark_mode(void);
 static GColor event_color(uint8_t color) {
 #ifdef PBL_COLOR
   switch (color & 0x7F) {
@@ -127,7 +129,7 @@ static GColor event_color(uint8_t color) {
     default: return GColorBlue;
   }
 #else
-  return GColorBlack;
+  return dark_mode() ? GColorWhite : GColorBlack;
 #endif
 }
 
@@ -254,6 +256,11 @@ static void restore_selection(void) {
       }
     }
   }
+  // If the previously selected event has expired/been filtered, fall back
+  // to the first visible appointment instead of an invalid menu selection.
+  if (s_num_sections > 0 && s_visible_count > 0)
+    menu_layer_set_selected_index(s_menu_layer,
+      (MenuIndex){.section=0,.row=0}, MenuRowAlignTop, false);
 }
 #if !PBL_PLATFORM_APLITE
 static void glance_callback(AppGlanceReloadSession *session, size_t limit, void *context) {
@@ -539,7 +546,8 @@ static void draw_head_callback(GContext* ctx, const Layer *l, uint16_t section, 
 // Draws the visual design of the individual event rows
 static void draw_row_callback(GContext* ctx, const Layer *l, MenuIndex *i, void *d) {
   if (s_num_sections == 0) { // If there is no data...
-    menu_cell_basic_draw(ctx, l, s_sync_in_progress ? "Loading..." : "No upcoming events", NULL, NULL); // ...draw a basic "Loading..." cell
+    menu_cell_basic_draw(ctx, l, s_sync_in_progress ? "Loading..." :
+      (s_calendar_error ? "Calendar unavailable" : "No upcoming events"), NULL, NULL); // ...draw a basic "Loading..." cell
     return; // Stop drawing
   }
   
@@ -608,6 +616,7 @@ static void sync_watchdog(void *context) {
   s_sync_watchdog=NULL;
   if (s_sync_in_progress && s_toast_layer) {
     s_sync_in_progress=false;
+    s_calendar_error=true;
     text_layer_set_text(s_toast_layer, "Sync delayed (cached)");
     layer_set_hidden(text_layer_get_layer(s_toast_layer), false);
     if (s_menu_layer) menu_layer_reload_data(s_menu_layer);
@@ -621,12 +630,14 @@ static void request_calendar_sync(bool force) {
     result = app_message_outbox_send();
   }
   if (result == APP_MSG_OK) {
+    s_calendar_error=false;
     if (s_sync_watchdog) app_timer_cancel(s_sync_watchdog);
     s_sync_watchdog=app_timer_register(60000,sync_watchdog,NULL);
     s_sync_in_progress = true;
     text_layer_set_text(s_toast_layer, "Syncing data...");
     layer_set_hidden(text_layer_get_layer(s_toast_layer), false);
   } else {
+    s_calendar_error=true;
     text_layer_set_text(s_toast_layer, "Phone unavailable");
     layer_set_hidden(text_layer_get_layer(s_toast_layer), false);
   }
@@ -803,6 +814,7 @@ static void finish_calendar_sync(CalendarEvent *incoming, int total, uint32_t id
   s_new_data_buffer=NULL;
   s_total_expected_events=total;
   s_sync_in_progress=false;
+  s_calendar_error=false;
   if (s_sync_watchdog) { app_timer_cancel(s_sync_watchdog); s_sync_watchdog=NULL; }
   s_completed_sync_id=id;
   s_active_sync_id=0;
@@ -833,6 +845,7 @@ static void inbox_handler(DictionaryIterator *iter, void *ctx) {
   if (status && status->type == TUPLE_CSTRING) {
     if (strcmp(status->value->cstring, "error") == 0) {
       s_sync_in_progress=false;
+      s_calendar_error=true;
       if (s_sync_watchdog) { app_timer_cancel(s_sync_watchdog); s_sync_watchdog=NULL; }
       text_layer_set_text(s_toast_layer, "Sync failed (cached)");
       layer_set_hidden(text_layer_get_layer(s_toast_layer), false);
