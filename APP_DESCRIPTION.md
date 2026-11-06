@@ -4,13 +4,13 @@
 
 See upcoming appointments alongside daily weather forecasts in a clean, glanceable Pebble agenda. Events come straight from the native Pebble Calendar plugin—no calendar URLs, separate accounts, or API keys to configure.
 
-**Calendar at a glance:** View appointments from the calendars you select in the Pebble mobile app. Color-code each discovered calendar and open an event to view available details. All-day events display correctly, and repeated appointments on different days are preserved.
+**Calendar at a glance:** View appointments from the calendars you select in the Pebble mobile app. Color-code each discovered calendar and open an event to see its time and location when available. All-day events display correctly, and repeated appointments on different days are preserved.
 
 **Daily weather:** The native Weather plugin supplies clear condition icons and daily high/low temperatures in each date header, without a separate weather service or API key.
 
 **Auto day/night:** Switches between light and dark themes using local sunrise and sunset when available. Manual Light and Dark options and a time-based fallback are also supported.
 
-**Designed for Pebble:** Adjustable event font sizes, compact rows, 12/24-hour time, optional past events, AppGlance next-event summary, reliable Bluetooth synchronization, offline cached appointments, and Force Sync.
+**Designed for Pebble:** Adjustable event font sizes, compact rows, 12/24-hour time, past-event filtering for cached entries, AppGlance next-event summary, reliable Bluetooth synchronization, offline cached appointments, and Force Sync.
 
 **How far ahead?** The native Calendar plugin currently supplies up to 10 upcoming events within seven days. The displayed time span depends on calendar activity; there is no fixed three-day or 72-hour cutoff.
 

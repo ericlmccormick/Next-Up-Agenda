@@ -2,7 +2,7 @@
 #include <pebble.h>
 
 // --- Configuration Constants ---
-// Define the maximum length for a calendar event title string (55 characters + 1 null terminator)
+// Up to 55 UTF-8 bytes plus a null terminator.
 #define MAX_TITLE_LEN 56 
 // Define how many events are sent in a single Bluetooth message to avoid hitting limits
 #define CHUNK_SIZE 2
@@ -35,7 +35,7 @@ typedef struct __attribute__((__packed__)) {
   uint32_t timestamp;     // The start time of the event in Unix Epoch seconds
   uint32_t end_timestamp; // The end time of the event in Unix Epoch seconds
   char title[MAX_TITLE_LEN]; // The title of the event
-  uint8_t color; // Calendar source color (1..6)
+  uint8_t color; // Low bits: calendar color (1..6); high bit: all-day flag.
 } CalendarEvent;
 
 // Define a structure to group events into days (Sections) for the MenuLayer
@@ -299,10 +299,10 @@ static void save_data_to_storage() {
   persist_delete(PERSIST_KEY_VERSION);
   if (persist_write_int(PERSIST_KEY_COUNT, s_total_expected_events) != (int)sizeof(int)) return;
   
-  // Write at most two 65-byte records per persistent-storage key.
+  // Store two 65-byte records (130 bytes) in each persistent-storage key.
   for (int i = 0; i < s_total_expected_events; i += CHUNK_SIZE) {
     int remaining = s_total_expected_events - i; // Calculate how many events are left
-    int to_save = (remaining < CHUNK_SIZE) ? remaining : CHUNK_SIZE; // Determine if we save a full chunk of 4, or a partial chunk
+    int to_save = (remaining < CHUNK_SIZE) ? remaining : CHUNK_SIZE;
     
     // Save the chunk to a unique key (102, 103, 104, etc.) to bypass the 256-byte limit
     if (persist_write_data(PERSIST_BASE_DATA_KEY + (i / CHUNK_SIZE), &s_event_array[i], to_save * sizeof(CalendarEvent)) != (int)(to_save * sizeof(CalendarEvent))) {
@@ -427,7 +427,7 @@ static void detail_unload(Window *window) {
 static void detail_timeout_callback(void *context) {
   s_detail_timeout=NULL;
   if (!s_detail_meta_layer || strcmp(s_detail_meta, "Loading details...")!=0) return;
-  snprintf(s_detail_meta, sizeof(s_detail_meta), "Details unavailable offline.\\nThe event list is saved on your watch.");
+  snprintf(s_detail_meta, sizeof(s_detail_meta), "Details unavailable offline.\nThe event list is saved on your watch.");
   text_layer_set_text(s_detail_meta_layer, s_detail_meta);
   layout_detail_content();
 }
@@ -1024,7 +1024,7 @@ static void main_load(Window *window) {
     .draw_header = draw_head_callback,
     .draw_row = draw_row_callback,
     .select_click = select_click_callback,
-    .select_long_click = select_long_click_callback // <--- NEW: Binds the Long Press callback
+    .select_long_click = select_long_click_callback
   });
   // Allow the MenuLayer to accept button clicks from the window
   menu_layer_set_click_config_onto_window(s_menu_layer, window);

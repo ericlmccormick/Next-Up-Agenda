@@ -9,8 +9,8 @@ A quick-glance calendar and daily weather agenda for Pebble watches. Calendar ev
 - Automatic light/dark theme based on today's sunrise and sunset; 7 AM–7 PM fallback if solar data is unavailable
 - Color choices for each discovered calendar and a default calendar color
 - All-day event support, duplicate-event filtering that preserves recurring appointments, 12/24-hour time, compact event rows and adjustable text size
-- Scrollable appointment details when provided by the Calendar plugin
-- AppGlance next-event summary, last successful synchronization, Force Sync, and optional past-event visibility
+- Scrollable appointment details with start/end times and location when provided by the Calendar plugin
+- AppGlance next-event summary, last successful synchronization, Force Sync, and optional filtering of completed cached events
 - Offline cached events and weather, with acknowledged/retried AppMessage transfers
 - Starts at the first visible appointment whenever the watch app opens
 
@@ -21,11 +21,11 @@ A quick-glance calendar and daily weather agenda for Pebble watches. Calendar ev
 3. Enable the **Weather** plugin if you want daily high/low temperatures, condition icons, or sunrise/sunset theme switching.
 4. Open the app's phone settings to choose default/per-calendar colors and display preferences. Long-press Select on the watch for Force Sync and watch-side settings.
 
-Without Calendar plugin data, the watch preserves its last valid agenda instead of erasing it on an unavailable-source error. A valid empty Calendar response clears out old events. Without the Weather plugin the calendar works normally, without daily forecasts, and Auto appearance uses the fallback times.
+Without Calendar plugin data, the watch preserves its last valid agenda instead of erasing it on an unavailable-source error. Badly shaped plugin responses also cannot erase valid cached events. A valid empty Calendar response clears out old events. Without the Weather plugin the calendar works normally, without daily forecasts, and Auto appearance uses the fallback times.
 
 ## Calendar window and source limits
 
-The native Calendar plugin currently returns **up to 10 upcoming events** within seven days; the amount of calendar time represented depends on event density. The agenda follows the native plugin output rather than enforcing a fixed number of hours or days. No additional calendar events are fetched from other sources.
+The native Calendar plugin currently returns **up to 10 upcoming events** within seven days; the amount of calendar time represented depends on event density. Its current fields are event title, start/end time, all-day status, location and calendar name; it does not currently provide descriptions or organizer information. The agenda follows the native plugin output rather than enforcing a fixed number of hours or days. No additional calendar events are fetched from other sources.
 
 The app removes only matching appointments with the same calendar, normalized title, start/end timestamps and location. Recurring meetings on different days, or distinct simultaneous meetings, remain visible. The Calendar plugin's own event limit still applies.
 

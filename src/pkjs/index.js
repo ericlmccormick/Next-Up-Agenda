@@ -30,6 +30,16 @@ var MAX_CHUNK_RETRIES = 4;
 var latestEvents = [];
 // Invalidate any previous cache containing ICS events on upgrading this app.
 function sourceSignature() { return 'native-calendar-only-v1'; }
+// Delete unused settings left by earlier ICS-capable versions of this app.
+// These legacy keys are not shared with the separate 7-Day ICS Calendar app.
+function removeLegacyIcsSettings() {
+  [
+    'user_ical_url','user_ical_url_1','user_ical_url_2','user_ical_url_3',
+    'user_ical_color_1','user_ical_color_2','user_ical_color_3',
+    'hybrid_plugin_enabled','hybrid_ics_sources','hybrid_ics_events',
+    'hybrid_ics_last_fetch'
+  ].forEach(function(key){try{localStorage.removeItem(key);}catch(e){}});
+}
 function restoreDetailCache() {
   if (localStorage.getItem('detail_cache_sources') !== sourceSignature()) return false;
   try {
@@ -225,9 +235,6 @@ function normalizePluginEnvelope(envelope) {
     entries.push({
       title:String(title),timestampMs:timestamp,endTimestampMs:end,
       location:String(propertyValue(p,['location','venue'])||''),
-      description:String(propertyValue(p,['description','notes'])||''),
-      url:String(propertyValue(p,['url','link'])||''),
-      organizer:String(propertyValue(p,['organizer'])||''),
       isAllDay:!!propertyValue(p,['all_day','allDay','isAllDay']),
       calendarName:calendarName,
       calendarColor:colorForCalendar(calendarName)
@@ -647,9 +654,6 @@ function detailText(event) {
   }
   if (event.isAllDay) out.push('All day');
   add('Location', event.location, 120);
-  add('Description', event.description, 180);
-  add('Organizer', event.organizer, 60);
-  add('Link', event.url, 100);
   var value = out.join('\n\n') || 'No additional details';
   // Limit by UTF-8 bytes to stay within Pebble's AppMessage inbox.
   var result = '', length = 0;
@@ -677,6 +681,7 @@ function detailText(event) {
 // Fired the moment the app boots up on the watch
 Pebble.addEventListener('ready', function() {
   console.log('Agenda: Companion started');
+  removeLegacyIcsSettings();
   detailCacheRestored=restoreDetailCache();
   startPluginCalendar();
   restoreSolarTimes();

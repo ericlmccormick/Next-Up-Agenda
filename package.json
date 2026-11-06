@@ -3,7 +3,13 @@
   "dependencies": {
     "pebble-clay": "^1.0.4"
   },
-  "keywords": [],
+  "keywords": [
+    "calendar",
+    "agenda",
+    "weather",
+    "pebble",
+    "plugins"
+  ],
   "name": "next-up-agenda",
   "pebble": {
     "capabilities": [
@@ -67,6 +73,6 @@
   },
   "version": "1.0.1",
   "scripts": {
-    "test": "node tests/utf8.test.js && node tests/sync-protocol.test.js && node tests/hybrid-calendar.test.js && node tests/calendar-plugin-errors.test.js && node tests/weather-solar.test.js && node tests/all-day.test.js && node tests/weather-forecast.test.js"
+    "test": "node tests/utf8.test.js && node tests/sync-protocol.test.js && node tests/calendar-integration.test.js && node tests/calendar-plugin-errors.test.js && node tests/weather-solar.test.js && node tests/all-day.test.js && node tests/weather-forecast.test.js"
   }
 }
