@@ -1,98 +1,80 @@
 'use strict';
+// Calendar is the sole event source, including after migration from a prior ICS install.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync('src/pkjs/index.js','utf8');
 const now=Date.now();
-function scenario(withIcs) {
-  const handlers={},sent=[],timers=new Map(),storage={};
-  const subs=[];
-  let seq=0,fetches=0;
-  if(withIcs) {
-    storage.user_ical_url_1='https://example.test/calendar.ics';
-    storage.hybrid_calendar_color_map=JSON.stringify({Personal:2,Work:5});
-  }
-  const localStorage={
-    getItem:k=>Object.prototype.hasOwnProperty.call(storage,k)?storage[k]:null,
-    setItem:(k,v)=>{storage[k]=String(v);},
-    removeItem:k=>{delete storage[k];}
-  };
-  function Request(){this.readyState=0;this.status=0;}
-  Request.prototype.open=function(method,url){this.url=url;};
-  Request.prototype.send=function(){
-    fetches++;
-    this.readyState=4;this.status=200;
-    this.responseText=JSON.stringify([
-      {title:'Shared',timestampMs:now+1800000,endTimestampMs:now+5400000},
-      {title:'ICS Only',timestampMs:now+10800000,endTimestampMs:now+14400000}
-    ]);
-    this.onreadystatechange();
-  };
-  function Clay(){this.setSettings=()=>{};this.generateUrl=()=>'';this.getSettings=()=>({});}
-  const Pebble={
-    addEventListener:(name,fn)=>{handlers[name]=fn;},
-    subscribeToSource:(args)=>{subs.push(args);return {unsubscribe:()=>{}};},
-    sendAppMessage:(payload,ok,err)=>{
-      sent.push(payload);
-      if(payload.CHUNK_INDEX!==undefined)
-        handlers.appmessage({payload:{SYNC_ID:payload.SYNC_ID,CHUNK_ACK:payload.CHUNK_INDEX}});
-      if(ok)ok();
-    },
-    getActiveWatchInfo:()=>({platform:'emery'}),
-    openURL:()=>{}
-  };
-  const ctx={
-    require:name=>name==='pebble-clay'?Clay:name==='message_keys'?{}:[],
-    Pebble,localStorage,XMLHttpRequest:Request,
-    setTimeout:(fn,delay)=>{const id=++seq;timers.set(id,{fn,delay});return id;},
-    clearTimeout:id=>timers.delete(id),
-    console
-  };
-  vm.createContext(ctx);
-  vm.runInContext(source,ctx);
-  handlers.ready();
-  assert.equal(subs.length,2,'Native Calendar and optional Weather plugins subscribed');
-  assert.equal(subs[0].category,'calendar');
-  assert.equal(subs[1].category,'weather');
-  assert.equal(fetches,withIcs?1:0,'ICS only queried when configured');
-  const instances=[
-    {instanceId:'one',properties:{
-      title:{longText:{text:'Shared'}},
-      starts_at:{timestamp:{value:Math.floor((now+1800000)/1000)}},
-      ends_at:{timestamp:{value:Math.floor((now+5400000)/1000)}},
-      location:{longText:{text:'Test room'}},
-      calendar:{shortText:{text:'Personal'}}
-    }},
-    {instanceId:'two',properties:{
-      name:{longText:{text:'Plugin Only'}},
-      starts_at:{timestamp:{value:Math.floor((now+7200000)/1000)}},
-      ends_at:{timestamp:{value:Math.floor((now+9000000)/1000)}},
-      calendar:{shortText:{text:'Work'}}
-    }},
-    {instanceId:'three',properties:{
-      name:{shortText:{text:' Plugin Only '}},
-      starts_at:{timestamp:{value:Math.floor((now+86400000)/1000)}},
-      calendar:{shortText:{text:'Work'}}
-    }}
-  ];
-  subs[0].onData({instances});
-  const queued=Array.from(timers.entries()).find(([,t])=>t.delay===750);
-  assert(queued,'plugin update debounced');
-  timers.delete(queued[0]);queued[1].fn();
-  const events=JSON.parse(storage.detail_cache_events);
-  assert.equal(events.length,withIcs?3:2);
-  assert.equal(events.filter(x=>x.title.trim()==='Shared').length,1);
-  assert.equal(events.filter(x=>x.title.trim()==='Plugin Only').length,1);
-  assert(events.some(x=>x.location==='Test room'),'plugin location retained');
-  assert(events.some(x=>x.calendarName==='Personal'),'native calendar name retained');
-  if(withIcs) {
-    assert.equal(events.find(x=>x.calendarName==='Personal').calendarColor,2);
-    assert.equal(events.find(x=>x.calendarName==='Work').calendarColor,5);
-  }
-  assert(JSON.parse(storage.hybrid_calendar_names).includes('Work'),'calendar names discovered for color settings');
-  assert(sent.some(x=>x.EVENT_DATA),'watch received compact event transfer');
-  assert(storage.last_fetch_time,'only successful acknowledged transfer saved');
+function scenario(previousIcs) {
+ const handlers={},sent=[],timers=new Map(),subs=[],data={};let nextId=0,requests=0;
+ if(previousIcs) {
+   data.user_ical_url_1='https://old.example/calendar.ics';
+   data.hybrid_plugin_enabled='false'; // Legacy setting must be ignored.
+   data.hybrid_calendar_color_map=JSON.stringify({Personal:2,Work:5});
+   data.detail_cache_sources='[{"url":"https://old.example/calendar.ics","color":1}]';
+   data.detail_cache_events=JSON.stringify([{title:'Obsolete ICS',timestampMs:now+3600000}]);
+ }
+ const storage={getItem:k=>Object.prototype.hasOwnProperty.call(data,k)?data[k]:null,
+ setItem:(k,v)=>data[k]=String(v),removeItem:k=>delete data[k]};
+ function LegacyRequest(){requests++ ;throw Error('ICS must never be fetched');}
+ function Clay(){this.setSettings=()=>{};this.generateUrl=()=>'';this.getSettings=()=>({});}
+ const pebble={
+  addEventListener:(name,fn)=>handlers[name]=fn,
+  subscribeToSource:options=>{subs.push(options);return {unsubscribe:()=>{}};},
+  sendAppMessage:(payload,ok)=>{
+    sent.push(payload);
+    if(payload.CHUNK_INDEX!==undefined)
+      handlers.appmessage({payload:{SYNC_ID:payload.SYNC_ID,CHUNK_ACK:payload.CHUNK_INDEX}});
+    if(ok)ok();
+  },
+  getActiveWatchInfo:()=>({platform:'emery'}),openURL:()=>{}
+ };
+ const ctx={require:name=>name==='pebble-clay'?Clay:name==='message_keys'?{}:[],
+  Pebble:pebble,localStorage:storage,XMLHttpRequest:LegacyRequest,
+  setTimeout:(fn,ms)=>{let id=++nextId;timers.set(id,{fn,ms});return id;},
+  clearTimeout:id=>timers.delete(id),console};
+ vm.createContext(ctx);vm.runInContext(source,ctx);
+ function fire(ms){
+  const entry=Array.from(timers.entries()).find(([,v])=>v.ms===ms);
+  assert(entry,'Missing timer '+ms);
+  timers.delete(entry[0]);entry[1].fn();
+ }
+ handlers.ready();
+ assert.equal(subs.length,2,'Calendar and Weather plugin subscriptions');
+ assert.equal(subs[0].category,'calendar');
+ assert.equal(subs[1].category,'weather');
+ assert.equal(requests,0);
+ assert.equal(data.last_fetch_time,undefined,'no false sync on launch');
+ assert(!ctx.detailCacheRestored,'outdated ICS cache ignored');
+ const instances=[
+  {instanceId:'a',properties:{name:{longText:{text:'Shared'}},
+    starts_at:{timestamp:{value:Math.floor((now+1800000)/1000)}},
+    ends_at:{timestamp:{value:Math.floor((now+5400000)/1000)}},
+    calendar:{shortText:{text:'Personal'}},location:{longText:{text:'Test room'}}}},
+  {instanceId:'b',properties:{name:{longText:{text:'Plugin Only'}},
+    starts_at:{timestamp:{value:Math.floor((now+7200000)/1000)}},
+    ends_at:{timestamp:{value:Math.floor((now+9000000)/1000)}},
+    calendar:{shortText:{text:'Work'}}}},
+  {instanceId:'c',properties:{name:{shortText:{text:' Plugin Only '}},
+    starts_at:{timestamp:{value:Math.floor((now+86400000)/1000)}},
+    calendar:{shortText:{text:'Work'}}}}
+ ];
+ subs[0].onData({instances});fire(750);
+ const events=JSON.parse(data.detail_cache_events);
+ assert.equal(events.length,2,'duplicate title filtering preserved');
+ assert(!events.some(x=>x.title==='Obsolete ICS'),'old ICS data not reused');
+ assert(events.some(x=>x.location==='Test room'),'native location retained');
+ assert.equal(events.find(x=>x.calendarName==='Personal').calendarColor,previousIcs?2:4);
+ assert.equal(events.find(x=>x.calendarName==='Work').calendarColor,previousIcs?5:4);
+ assert(sent.some(x=>x.EVENT_DATA),'watch received events');
+ assert(data.last_fetch_time,'cache written after full ACK');
+ assert.equal(data.detail_cache_sources,'native-calendar-only-v1');
+ assert.equal(requests,0);
+ // An authoritative empty plugin update clears the watch instead of retaining stale events.
+ subs[0].onData({instances:[]});fire(750);
+ assert.equal(JSON.parse(data.detail_cache_events).length,0,'empty calendar clears cache');
+ assert(sent.some(x=>x.TOTAL_EVENTS===0),'empty watch update sent');
 }
 scenario(false);
 scenario(true);
-console.log('Hybrid plugin-only and mixed-calendar integration tests passed');
+console.log('Native Calendar-only integration, migration, dedup and empty state passed');
