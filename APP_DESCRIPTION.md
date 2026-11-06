@@ -1,4 +1,4 @@
-# Pebble 3-Day Agenda
+# Pebble 72-Hour Agenda
 
 **Your calendar and weather at a glance, powered by Pebble Plugins.**
 
@@ -12,7 +12,7 @@ See upcoming appointments alongside daily weather forecasts in a clean, glanceab
 
 **Designed for Pebble:** Adjustable event font sizes, compact rows, 12/24-hour time, optional past events, AppGlance next-event summary, reliable Bluetooth synchronization, offline cached appointments, and Force Sync.
 
-**How many days?** The native Calendar plugin currently supplies up to 10 upcoming events in a seven-day window. Depending on how busy your calendar is, your agenda may cover roughly three days—or more or fewer.
+**How far ahead?** The native Calendar plugin currently supplies up to 10 upcoming events within seven days. The app is not currently capped to exactly 72 hours; the displayed time span depends on calendar activity.
 
 **Requirements:** Enable the native Calendar plugin and grant calendar access in the Pebble mobile app. The Weather plugin is optional.
 
@@ -20,4 +20,4 @@ See upcoming appointments alongside daily weather forecasts in a clean, glanceab
 
 **Support development:** https://ko-fi.com/ericmccormick
 
-**Source code:** https://github.com/ericlmccormick/Pebble_3day_Agenda
+**Source code:** https://github.com/ericlmccormick/Pebble_72hr_Agenda

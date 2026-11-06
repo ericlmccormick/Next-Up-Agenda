@@ -4,12 +4,12 @@
     "pebble-clay": "^1.0.4"
   },
   "keywords": [],
-  "name": "pebble-3day-agenda",
+  "name": "pebble-72hr-agenda",
   "pebble": {
     "capabilities": [
       "configurable"
     ],
-    "displayName": "3day Agenda",
+    "displayName": "72hr Agenda",
     "enableMultiJS": true,
     "messageKeys": [
       "TOTAL_EVENTS",

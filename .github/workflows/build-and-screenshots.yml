@@ -1,4 +1,4 @@
-name: Build and capture Pebble 3-Day Agenda
+name: Build and capture Pebble 72-Hour Agenda
 
 on:
   push:
@@ -45,11 +45,11 @@ jobs:
           pebble clean
           pebble build
           test "$(find build -type f -name '*.pbw' | wc -l)" -eq 1
-          cp "$(find build -type f -name '*.pbw' | head -1)" 3day-agenda.pbw
+          cp "$(find build -type f -name '*.pbw' | head -1)" 72hr-agenda.pbw
       - uses: actions/upload-artifact@v4
         with:
-          name: 3day-agenda-pbw
-          path: 3day-agenda.pbw
+          name: 72hr-agenda-pbw
+          path: 72hr-agenda.pbw
           if-no-files-found: error
       - name: Publish direct-download PBW
         if: github.event_name != 'pull_request'
@@ -57,9 +57,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view dev-latest >/dev/null 2>&1; then
-            gh release upload dev-latest 3day-agenda.pbw --clobber
+            gh release edit dev-latest --title "Pebble 72-Hour Agenda development build" --notes "Latest native Calendar plugin build from main."
+            gh release upload dev-latest 72hr-agenda.pbw --clobber
+            gh release delete-asset dev-latest 3day-agenda.pbw --yes 2>/dev/null || true
           else
-            gh release create dev-latest 3day-agenda.pbw --prerelease --title "Pebble 3-Day Agenda development build" --notes "Latest build from main, with native Calendar/Weather plugins and optional ICS." --target "$GITHUB_SHA"
+            gh release create dev-latest 72hr-agenda.pbw --prerelease --title "Pebble 72-Hour Agenda development build" --notes "Latest build from main, with native Calendar and optional Weather plugins." --target "$GITHUB_SHA"
           fi
 
   screenshots:
@@ -69,7 +71,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: 3day-agenda-pbw
+          name: 72hr-agenda-pbw
       - name: Install Pebble emulator
         run: |
           sudo apt-get update
@@ -86,17 +88,17 @@ jobs:
           mkdir -p screenshots
           for platform in aplite basalt chalk diorite emery; do
             echo "::group::Screenshot $platform"
-            timeout 150 pebble install 3day-agenda.pbw --emulator "$platform" --vnc
+            timeout 150 pebble install 72hr-agenda.pbw --emulator "$platform" --vnc
             sleep 2
             python3 tools/screenshot_fixture.py --platform "$platform"
             sleep 2
-            timeout 60 pebble screenshot --no-open --emulator "$platform" --vnc "screenshots/3day-agenda-$platform.png"
-            test -s "screenshots/3day-agenda-$platform.png"
+            timeout 60 pebble screenshot --no-open --emulator "$platform" --vnc "screenshots/72hr-agenda-$platform.png"
+            test -s "screenshots/72hr-agenda-$platform.png"
             echo "::endgroup::"
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: 3day-agenda-screenshots
+          name: 72hr-agenda-screenshots
           path: screenshots/*.png
           if-no-files-found: error
       - name: Publish direct PNG assets
@@ -109,3 +111,7 @@ jobs:
             sleep 5
           done
           gh release upload dev-latest screenshots/*.png --clobber
+          # Remove pre-rename assets from the development release.
+          for platform in aplite basalt chalk diorite emery; do
+            gh release delete-asset dev-latest "3day-agenda-$platform.png" --yes 2>/dev/null || true
+          done
