@@ -1,19 +1,23 @@
-# Pebble 3-Day Agenda — Experimental
+# Pebble 3-Day Agenda
 
-Combine your Pebble phone's calendars with up to three optional ICS feeds in one color-coded, seven-day agenda.
+**Your calendar and weather at a glance, powered by Pebble Plugins.**
 
-**Native Calendar Plugin:** Enable the built-in Calendar source to read the next **10 upcoming appointments within seven days** from calendars enabled in the Pebble mobile app. Calendar names are discovered automatically, so you can assign individual colors in the phone settings.
+See upcoming appointments alongside daily weather forecasts in a clean, glanceable Pebble agenda. Events come straight from the native Pebble Calendar plugin—no calendar URLs, separate accounts, or API keys to configure.
 
-**Optional ICS Calendars:** Paste up to three ICS URLs, each with its own color. Leave every URL blank to run entirely on the native Calendar plugin. Disable the plugin if you prefer ICS only.
+**Calendar at a glance:** View appointments from the calendars you select in the Pebble mobile app. Color-code each discovered calendar and open an event to view available details. All-day events are displayed as all-day rather than misleading start times.
 
-**Duplicate Removal:** Events with the same title (ignoring case and surrounding whitespace) are reduced to one, even if the appointments occur at different times. The earliest occurrence is kept.
+**Daily weather:** The native Weather plugin supplies clear condition icons and daily high/low temperatures in each date header, without a separate weather service or API key.
 
-**Pebble Features:** Offline cached event list, App Glance on supported watches, scrollable details, Force Sync, font sizing, time format, themes, past-event filtering, and optional detail status bar.
+**Auto day/night:** Switches between light and dark themes using local sunrise and sunset when available. Manual Light and Dark options and a time-based fallback are also supported.
 
-**Theme Auto Mode:** Uses the watch's local clock, switching to dark at 7:00 PM and back to light at 7:00 AM. This is not a solar sunrise/sunset calculation.
+**Designed for Pebble:** Adjustable event font sizes, compact rows, 12/24-hour time, optional past events, AppGlance next-event summary, reliable Bluetooth synchronization, offline cached appointments, and Force Sync.
 
-**Important:** Plugins are still an experimental Pebble feature. The native plugin returns at most 10 events, even if more are scheduled within seven days. Additional future events require ICS feeds. Some event fields, such as descriptions, are available only from ICS, not from Pebble's current Calendar plugin. Extended event details depend on the phone.
+**How many days?** The native Calendar plugin currently supplies up to 10 upcoming events in a seven-day window. Depending on how busy your calendar is, your agenda may cover roughly three days—or more or fewer.
 
-**Requirements:** Enable Plugins Preview and allow Calendar access in the Pebble mobile app. Do not publish this plugin-dependent app until Pebble's API is stable.
+**Requirements:** Enable the native Calendar plugin and grant calendar access in the Pebble mobile app. The Weather plugin is optional.
 
-Support development: https://ko-fi.com/ericmccormick
+**Compatible watches:** Pebble / Steel, Time / Time Steel, Time Round, Pebble 2, and Pebble Time 2.
+
+**Support development:** https://ko-fi.com/ericmccormick
+
+**Source code:** https://github.com/ericlmccormick/Pebble_3day_Agenda
