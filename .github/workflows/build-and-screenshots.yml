@@ -1,0 +1,102 @@
+name: Build and capture Pebble 3-Day Agenda
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run regression tests
+        run: npm test
+
+  build:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Pebble SDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpng-dev
+          python3 -m pip install --user --break-system-packages uv
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          ~/.local/bin/uv tool install --python 3.12 pebble-tool
+          ~/.local/bin/uv run --python 3.12 pebble --help >/dev/null || true
+      - name: Compile all five Pebble platforms
+        run: |
+          pebble sdk install latest
+          pebble clean
+          pebble build
+          test "$(find build -type f -name '*.pbw' | wc -l)" -eq 1
+          cp "$(find build -type f -name '*.pbw' | head -1)" 3day-agenda.pbw
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3day-agenda-pbw
+          path: 3day-agenda.pbw
+          if-no-files-found: error
+      - name: Publish direct-download PBW
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view dev-latest >/dev/null 2>&1; then
+            gh release upload dev-latest 3day-agenda.pbw --clobber
+          else
+            gh release create dev-latest 3day-agenda.pbw --prerelease --title "Pebble 3-Day Agenda development build" --notes "Latest build from main, with native Calendar/Weather plugins and optional ICS." --target "$GITHUB_SHA"
+          fi
+
+  screenshots:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3day-agenda-pbw
+      - name: Install Pebble emulator
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpng-dev libgl1 libegl1 libpulse0
+          python3 -m pip install --user --break-system-packages uv
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          ~/.local/bin/uv tool install --python 3.12 pebble-tool
+          pebble sdk install latest
+      - name: Capture all supported watch screens
+        shell: bash
+        run: |
+          mkdir -p screenshots
+          for platform in aplite basalt chalk diorite emery; do
+            echo "::group::Screenshot $platform"
+            timeout 150 pebble install 3day-agenda.pbw --emulator "$platform" --vnc
+            sleep 3
+            timeout 60 pebble screenshot --no-open --emulator "$platform" --vnc "screenshots/3day-agenda-$platform.png"
+            test -s "screenshots/3day-agenda-$platform.png"
+            echo "::endgroup::"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3day-agenda-screenshots
+          path: screenshots/*.png
+          if-no-files-found: error
+      - name: Publish direct PNG assets
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in {1..12}; do
+            gh release view dev-latest >/dev/null 2>&1 && break
+            sleep 5
+          done
+          gh release upload dev-latest screenshots/*.png --clobber

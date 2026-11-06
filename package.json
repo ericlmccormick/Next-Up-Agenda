@@ -1,0 +1,88 @@
+{
+  "author": "ericlmccormick@gmail.com",
+  "dependencies": {
+    "pebble-clay": "^1.0.4"
+  },
+  "keywords": [],
+  "name": "pebble-3day-agenda",
+  "pebble": {
+    "capabilities": [
+      "configurable"
+    ],
+    "displayName": "3day Agenda",
+    "enableMultiJS": true,
+    "messageKeys": [
+      "TOTAL_EVENTS",
+      "CHUNK_INDEX",
+      "EVENT_DATA",
+      "TIME_FORMAT",
+      "ICAL_URL",
+      "ICAL_URL_2",
+      "ICAL_URL_3",
+      "SYNC_STATUS",
+      "ICAL_COLOR_1",
+      "ICAL_COLOR_2",
+      "ICAL_COLOR_3",
+      "FONT_SIZE",
+      "DETAIL_REQUEST",
+      "DETAIL_TEXT",
+      "SYNC_COMMAND",
+      "SYNC_ID",
+      "SYNC_CHECKSUM",
+      "CHUNK_ACK",
+      "WATCH_PREFS",
+      "THEME_MODE",
+      "SHOW_PAST",
+      "DETAIL_STATUS_BAR",
+      "DETAIL_TOKEN",
+      "PLUGIN_ENABLED",
+      "PLUGIN_COLOR",
+      "PLUGIN_CALENDAR_COLOR_1",
+      "PLUGIN_CALENDAR_COLOR_2",
+      "PLUGIN_CALENDAR_COLOR_3",
+      "PLUGIN_CALENDAR_COLOR_4",
+      "PLUGIN_CALENDAR_COLOR_5",
+      "PLUGIN_CALENDAR_COLOR_6",
+      "PLUGIN_CALENDAR_COLOR_7",
+      "PLUGIN_CALENDAR_COLOR_8",
+      "PLUGIN_CALENDAR_COLOR_9",
+      "PLUGIN_CALENDAR_COLOR_10",
+      "SUNRISE_TIME",
+      "SUNSET_TIME",
+      "WEATHER_FORECAST"
+    ],
+    "projectType": "native",
+    "resources": {
+      "media": []
+    },
+    "sdkVersion": "3",
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery"
+    ],
+    "uuid": "2a5c0d64-e4e5-4fe8-9e91-6e11b9f124cd",
+    "watchapp": {
+      "watchface": false
+    },
+    "usesPermissions": [
+      "Calendar",
+      {
+        "name": "Internet",
+        "parameters": {
+          "domains": [
+            "script.google.com",
+            "script.googleusercontent.com"
+          ]
+        }
+      },
+      "Location"
+    ]
+  },
+  "version": "0.1.0",
+  "scripts": {
+    "test": "node tests/utf8.test.js && node tests/multi-calendar.test.js && node tests/sync-protocol.test.js && node tests/hybrid-calendar.test.js && node tests/weather-solar.test.js && node tests/all-day.test.js && node tests/weather-forecast.test.js"
+  }
+}

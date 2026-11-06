@@ -1,3 +1,43 @@
 # Pebble 3-Day Agenda
 
-Native Calendar and Weather plugin-powered Pebble agenda, with optional ICS calendars.
+An independent Pebble agenda app using the native Calendar and Weather plugins, with optional ICS feeds. This repository has its own `main` branch and release builds. It retains the hybrid app UUID so an existing hybrid installation upgrades in place, while the original 7-Day ICS Calendar remains a separate app.
+
+## Calendar sources
+
+1. **Native Pebble Calendar**, enabled by default. With Plugins Preview enabled and Calendar access permitted, the companion subscribes to `calendar/event` and reads upcoming events from the calendars enabled in the Pebble mobile app (Settings → Calendar).
+2. **ICS Calendars 1–3**, optional. Blank URLs are ignored. They continue to use the existing Google Apps Script ICS proxy. If all three URLs are blank, the app uses only the plugin. If the plugin is disabled, the app uses only ICS.
+
+Both sources merge into one date-sorted agenda with the same watch UI, settings, App Glance, compact 65-byte event records, transactional Bluetooth acknowledgements, and offline event list as the parent v1.8 app.
+
+**Duplicate policy is intentionally aggressive:** titles are compared case-insensitively after trimming/collapsing spaces, and **only the earliest appointment with a given title is retained**, even on a different day. For example, Monday "Gym" and Wednesday "Gym" become one item. Change this policy if you want recurring appointments preserved.
+
+## Native plugin's actual limits
+
+According to `libpebble3/.../plugin/CalendarPlugin.kt` in the official Pebble mobile app:
+- Queries a **seven-day future window**, returning **up to 10 upcoming events total**, across all user-enabled calendars.
+- Fields: `name`, `starts_at`, `ends_at`, `location`, `all_day`, `calendar`.
+- `starts_at` and `ends_at` use the Pebble plugin's `timestamp` shape (epoch seconds).
+- `calendar` is the display name of the originating calendar. The settings UI shows each discovered name with an individual color picker (Blue, Red, Green, Yellow, Orange, Purple), saved between app restarts. Calendars with no upcoming events will not be discovered until they have an event. Identically named calendars are treated as one color group.
+- The built-in plugin refreshes on a timer and calendar-change signals while subscribed; no guarantee of background updates after the watch app exits.
+
+The plugin does **not** guarantee all events within seven days; the maximum of 10 may omit later events.
+
+## Settings
+
+Open Pebble mobile app → 3day Agenda → Settings. Enable/disable the native Calendar plugin and select a default color. When the plugin has supplied event data, individually discovered calendar names appear with separate color selectors. ICS 1–3 URLs remain optional, each with its own color. The watch's long-press Select menu controls Force Sync, Auto/Light/Dark appearance, font size, past-event filtering, time format, detail status bar, and last sync time.
+
+**Auto** appearance subscribes to the built-in Weather plugin's `weather/location` source, requesting `sunrise` and `sunset` in epoch seconds. If today's valid readings are present, the watch switches at actual sunrise and sunset. The watch persists those readings and updates its appearance each minute. If Weather is unavailable, Location permission is denied, today's weather is missing, or the solar readings are from a previous local date, it falls back to dark at 19:00–06:59 and light at 07:00–18:59. In the presence of multiple Weather locations it uses the first location supplying valid current-day values, following the user's location order. Manual Light/Dark overrides always take precedence. This optional source does not trigger new weather network downloads by itself.
+
+## Requirements and testing
+
+- The Pebble mobile app's **Plugins Preview** must be enabled for native calendar access. The app declares the `Calendar` permission and optional `Location` permission for Weather solar times. If the plugin is absent or permission is denied, configured ICS feeds can still provide data; if there are no usable sources, the watch preserves its last valid calendar.
+- Plugin access and exact schema are experimental and may change. **Do not publish this build to the Pebble Appstore** until the plugin API becomes stable.
+- `npm test` runs UTF-8, source/deduplication, transaction/retry, and plugin-only/mixed-source tests.
+- `pebble build` must still be run in a Pebble SDK/CloudPebble environment. The current branch has not been compiled on a physical watch.
+- The app is a branch-based independent variant; creating an entirely separate GitHub repository requires a repository-creation operation outside the available GitHub connector.
+
+## Security
+
+Treat private ICS feed URLs as credentials. ICS feeds are fetched via the configured Apps Script proxy. Native plugin data comes from the Pebble mobile app's configured calendars and is subject to user permission.
+
+Source: https://github.com/coredevices/mobileapp/blob/main/libpebble3/src/commonMain/kotlin/io/rebble/libpebblecommon/plugin/CalendarPlugin.kt
