@@ -24,7 +24,7 @@ def get_keys():
         if {"TOTAL_EVENTS", "EVENT_DATA", "SYNC_CHECKSUM", "WEATHER_FORECAST"}.issubset(keys):
             return keys
     # PBW metadata fallback (some SDK builds put the numeric dictionary there).
-    with zipfile.ZipFile("72hr-agenda.pbw") as archive:
+    with zipfile.ZipFile("next-up-agenda.pbw") as archive:
         for filename in archive.namelist():
             if filename.endswith("appinfo.json"):
                 info = json.loads(archive.read(filename))

@@ -459,7 +459,7 @@ function queueSolarTimes(solar) {
 }
 function startWeatherPlugin() {
   if (typeof Pebble.subscribeToSource!=='function') {
-    console.log('72hr Agenda: Weather plugin API unavailable; Auto uses local clock fallback');
+    console.log('Next Up Agenda: Weather plugin API unavailable; Auto uses local clock fallback');
     return;
   }
   if (weatherSubscription) return;
@@ -479,15 +479,15 @@ function startWeatherPlugin() {
           queueSolarTimes(solar);
         } else {
           // A missing forecast must not replace a previously valid same-day reading.
-          console.log('72hr Agenda: Weather plugin has no current-day solar times; clock fallback applies');
+          console.log('Next Up Agenda: Weather plugin has no current-day solar times; clock fallback applies');
         }
       },
       onError:function(error) {
-        console.log('72hr Agenda: Optional Weather source unavailable: '+(error && error.message || error));
+        console.log('Next Up Agenda: Optional Weather source unavailable: '+(error && error.message || error));
       }
     });
   } catch(err) {
-    console.log('72hr Agenda: Weather subscription unavailable; Auto uses clock fallback: '+err);
+    console.log('Next Up Agenda: Weather subscription unavailable; Auto uses clock fallback: '+err);
   }
 }
 function restoreSolarTimes() {

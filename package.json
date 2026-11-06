@@ -4,12 +4,12 @@
     "pebble-clay": "^1.0.4"
   },
   "keywords": [],
-  "name": "pebble-72hr-agenda",
+  "name": "next-up-agenda",
   "pebble": {
     "capabilities": [
       "configurable"
     ],
-    "displayName": "72hr Agenda",
+    "displayName": "Next Up Agenda",
     "enableMultiJS": true,
     "messageKeys": [
       "TOTAL_EVENTS",
