@@ -1,11 +1,11 @@
-# Next Up Agenda 1.0.0
+# Next Up Agenda 1.1.0
 
-First public release of Next Up Agenda for Pebble watches.
+Choose a weather source in the phone settings. Use Pebble's preferred source, select an installed plugin such as Weather+, or choose No Weather to hide forecasts and use local clock times for automatic appearance. Changing sources clears the previous forecast and sunrise/sunset data from the watch.
 
 ## Features
 
 - Automatically displays appointments from the native Pebble Calendar plugin, with no external ICS feed or API key required
-- Optional Pebble Weather plugin daily forecast glyphs, high/low temperatures, and sunrise/sunset-based automatic theme
+- Optional weather plugin daily forecast glyphs, high/low temperatures, and sunrise/sunset-based automatic theme
 - Calendar-specific colors, compact scrolling event rows, adjustable font size and 12/24-hour time
 - Proper all-day event handling, including local dates and daylight-saving transitions
 - Event details with start/end times and location when provided by the plugin
