@@ -10,16 +10,20 @@ assert(start>0 && end>start,'weather adapter present');
 const signals=[];
 const storage={};
 const listeners=[];
-let timerId=0;
+let timerId=0,unsubscribed=0,ackSource;
 const ctx={
   console:{log:()=>{}},
   localStorage:{getItem:k=>storage[k]||null,setItem:(k,v)=>storage[k]=String(v)},
   Pebble:{
     subscribeToSource:options=>{
       listeners.push(options);
-      return {unsubscribe:()=>{}};
+      return {unsubscribe:()=>{unsubscribed++;}};
     },
-    sendAppMessage:(payload,success)=>{signals.push(payload);if(success)success();}
+    sendAppMessage:(payload,success)=>{
+      signals.push(payload);
+      if (payload.WEATHER_SOURCE!==undefined) ackSource=success;
+      else if(success)success();
+    }
   },
   activeTransfer:null,syncBusy:false,
   setTimeout:(callback,ms)=>++timerId,
@@ -60,4 +64,33 @@ listeners[0].onData(envelope);
 assert.equal(signals.length,1,'identical solar readings not resent');
 ctx.restoreSolarTimes();
 assert.equal(signals.length,1,'cache restoration avoids duplicate send');
-console.log('Weather solar Auto mode regression tests passed');
+const weatherPlus='7f7b6c10-93e0-4f4c-9237-7e8204c5a121';
+const other='1cc11111-aaaa-4444-bbbb-123456789abc';
+ctx.Pebble.enumeratePlugins=()=>[
+  {uuid:other,name:'Other Weather',sources:[{category:'weather',items:['location']}]},
+  {uuid:weatherPlus,name:'Calendar only',sources:[{category:'calendar',items:['event']}]}
+];
+assert.deepEqual(Array.from(ctx.weatherPluginChoices(),choice=>choice.value),[other]);
+storage.agenda_weather_source=weatherPlus;
+ctx.configureWeatherSource();
+assert.equal(unsubscribed,1);
+assert.equal(listeners[1].plugin,weatherPlus);
+assert.equal(signals.at(-1).WEATHER_SOURCE,weatherPlus);
+assert.equal(signals.length,2,'switch does not replay the old source cache');
+listeners[0].onData(envelope);
+listeners[1].onData({...envelope,pluginUuid:other});
+assert.equal(signals.length,2,'ignore callbacks from old or fallback sources');
+listeners[1].onData({...envelope,pluginUuid:weatherPlus});
+assert.equal(signals.length,2,'wait for the watch to clear previous source');
+ackSource();
+assert.equal(signals.at(-1).SUNRISE_TIME,rise);
+assert(storage['hybrid_solar_cache:'+weatherPlus]);
+storage.agenda_weather_source='none';
+ctx.configureWeatherSource();
+ackSource();
+assert.equal(unsubscribed,2);
+assert.equal(listeners.length,2,'No Weather leaves no subscription');
+listeners[1].onData({...envelope,pluginUuid:weatherPlus});
+assert.equal(signals.length,4);
+assert.equal(signals.at(-1).WEATHER_SOURCE,'none');
+console.log('Weather solar and source switching regression tests passed');

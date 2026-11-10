@@ -338,6 +338,37 @@ function startPluginCalendar() {
 var forecastPending=null;
 var forecastLastSent='';
 var forecastTimer=null;
+var WEATHER_PLUS_UUID='7f7b6c10-93e0-4f4c-9237-7e8204c5a121';
+var weatherSourceGeneration=0;
+var weatherSourcePending=false;
+var weatherSourceTimer=null;
+
+function selectedWeatherSource() {
+  return localStorage.getItem('agenda_weather_source') || 'auto';
+}
+
+function weatherCacheKey(key) {
+  var source=selectedWeatherSource();
+  return source==='auto' ? key : key+':'+source;
+}
+
+function weatherPluginChoices() {
+  if (typeof Pebble.enumeratePlugins!=='function') return [];
+  try {
+    var plugins=Pebble.enumeratePlugins();
+    if (!Array.isArray(plugins)) return [];
+    return plugins.filter(function(plugin) {
+      return plugin && typeof plugin.uuid==='string' &&
+        /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(plugin.uuid) &&
+        Array.isArray(plugin.sources) && plugin.sources.some(function(source) {
+          return source && source.category==='weather' &&
+            Array.isArray(source.items) && source.items.indexOf('location')!==-1;
+        });
+    }).map(function(plugin) {
+      return {label:plugin.name || 'Weather Plugin',value:plugin.uuid.toLowerCase()};
+    });
+  } catch(e) { return []; }
+}
 function conditionIconCode(code) {
   switch(String(code||'').toLowerCase().replace(/-/g,'_')) {
     case 'sun': return 1;
@@ -356,7 +387,12 @@ function weatherSeries(properties,name,shape) {
   if (!series || Number(series.stepSec)!==86400) return null;
   var values=series[shape] && series[shape].values;
   if (!Array.isArray(values) || !isFinite(Number(series.start))) return null;
-  return {start:Number(series.start),values:values};
+  return {start:Number(series.start),values:values,unit:series[shape].unit};
+}
+function displayTemperature(value,unit) {
+  if (unit==='K' || unit==='°K') return value-273.15;
+  if (unit==='R' || unit==='°R') return value*5/9-273.15;
+  return value;
 }
 function forecastFromEnvelope(envelope) {
   var instances=envelope && Array.isArray(envelope.instances)?envelope.instances:[];
@@ -370,7 +406,8 @@ function forecastFromEnvelope(envelope) {
     if(!highs || !lows || !codes || highs.start!==lows.start || highs.start!==codes.start) continue;
     var items=[],seen={};
     for(var i=0;i<Math.min(10,highs.values.length,lows.values.length,codes.values.length);i++){
-      var h=Number(highs.values[i]),l=Number(lows.values[i]),code=codes.values[i];
+      var h=displayTemperature(Number(highs.values[i]),highs.unit);
+      var l=displayTemperature(Number(lows.values[i]),lows.unit),code=codes.values[i];
       if(highs.values[i]===null || lows.values[i]===null || code===null ||
           !isFinite(h) || !isFinite(l) || h< -120 || h>150 || l< -120 || l>150) continue;
       // Series start is location-local midnight in UTC seconds. Take midday
@@ -404,18 +441,19 @@ function packForecast(items) {
   return Array.prototype.slice.call(bytes);
 }
 function deliverForecast() {
-  if (!forecastPending || activeTransfer || syncBusy) {
+  if (!forecastPending || weatherSourcePending || activeTransfer || syncBusy) {
     if(forecastPending && !forecastTimer)
       forecastTimer=setTimeout(function(){forecastTimer=null;deliverForecast();},1000);
     return;
   }
-  var pending=forecastPending,signature=JSON.stringify(pending);
+  var pending=forecastPending,signature=JSON.stringify(pending),generation=weatherSourceGeneration;
   if(signature===forecastLastSent) {forecastPending=null;return;}
   Pebble.sendAppMessage({WEATHER_FORECAST:packForecast(pending)},function(){
+    if(generation!==weatherSourceGeneration) return;
     forecastLastSent=signature;
     if(forecastPending===pending) forecastPending=null;
   },function(){
-    if(!forecastTimer) forecastTimer=setTimeout(function(){forecastTimer=null;deliverForecast();},2500);
+    if(generation===weatherSourceGeneration && !forecastTimer) forecastTimer=setTimeout(function(){forecastTimer=null;deliverForecast();},2500);
   });
 }
 function queueForecast(items) {
@@ -425,7 +463,7 @@ function queueForecast(items) {
 }
 function restoreForecast() {
   try {
-    var stored=JSON.parse(localStorage.getItem('hybrid_forecast_cache')||'null');
+    var stored=JSON.parse(localStorage.getItem(weatherCacheKey('hybrid_forecast_cache'))||'null');
     if(stored && Array.isArray(stored.items) && Date.now()-Number(stored.savedAt)<6*3600000) {
       var today=new Date();today.setHours(0,0,0,0);
       var filtered=stored.items.filter(function(item){return item.dateSec*1000>=today.getTime();});
@@ -460,18 +498,22 @@ function solarFromEnvelope(envelope) {
   return null;
 }
 function deliverSolarTimes() {
-  if (!pendingSolar || activeTransfer || syncBusy) {
+  if (!pendingSolar || weatherSourcePending || activeTransfer || syncBusy) {
     if (pendingSolar && !solarRetryTimer)
       solarRetryTimer=setTimeout(function(){solarRetryTimer=null;deliverSolarTimes();},1000);
     return;
   }
-  var solar=pendingSolar,key=solar.sunrise+':'+solar.sunset;
+  var solar=pendingSolar,key=solar.sunrise+':'+solar.sunset,generation=weatherSourceGeneration;
   if (lastSolarSent===key) {pendingSolar=null;return;}
   Pebble.sendAppMessage({SUNRISE_TIME:solar.sunrise,SUNSET_TIME:solar.sunset},
-    function() {lastSolarSent=key;pendingSolar=null;},
+    function() {
+      if(generation!==weatherSourceGeneration) return;
+      lastSolarSent=key;
+      if(pendingSolar===solar) pendingSolar=null;
+    },
     function() {
       // A short companion AppMessage collision must not affect calendar sync.
-      if (!solarRetryTimer) solarRetryTimer=setTimeout(function(){
+      if (generation===weatherSourceGeneration && !solarRetryTimer) solarRetryTimer=setTimeout(function(){
         solarRetryTimer=null;deliverSolarTimes();
       },3000);
     });
@@ -482,24 +524,36 @@ function queueSolarTimes(solar) {
   deliverSolarTimes();
 }
 function startWeatherPlugin() {
+  var source=selectedWeatherSource(),generation=weatherSourceGeneration;
+  if (source==='none') return;
   if (typeof Pebble.subscribeToSource!=='function') {
     console.log('Next Up Agenda: Weather plugin API unavailable; Auto uses local clock fallback');
     return;
   }
   if (weatherSubscription) return;
   try {
-    weatherSubscription=Pebble.subscribeToSource({
+    var request={
       category:'weather',item:'location',
-      properties:['sunrise','sunset','daily_high','daily_low','daily_condition_code'],
+      properties:['sunrise','sunset','daily_high','daily_low','daily_condition_code','last_fetched_at'],
       onData:function(envelope) {
+        if (generation!==weatherSourceGeneration || !envelope) return;
+        if (source!=='auto') {
+          var actual=String(envelope.pluginUuid || '').toLowerCase();
+          // Older Weather+ envelopes can lack provenance. Its extended fetch
+          // timestamp distinguishes them from the native Weather fallback.
+          var first=envelope.instances && envelope.instances[0];
+          var weatherPlus=source===WEATHER_PLUS_UUID && first &&
+            first.properties && first.properties.last_fetched_at;
+          if (actual ? actual!==source : !weatherPlus) return;
+        }
         var forecast=forecastFromEnvelope(envelope);
         if(forecast.length) {
-          try {localStorage.setItem('hybrid_forecast_cache',JSON.stringify({savedAt:Date.now(),items:forecast}));}catch(e){}
+          try {localStorage.setItem(weatherCacheKey('hybrid_forecast_cache'),JSON.stringify({savedAt:Date.now(),items:forecast}));}catch(e){}
           queueForecast(forecast);
         }
         var solar=solarFromEnvelope(envelope);
         if (solar) {
-          try {localStorage.setItem('hybrid_solar_cache',JSON.stringify(solar));}catch(e){}
+          try {localStorage.setItem(weatherCacheKey('hybrid_solar_cache'),JSON.stringify(solar));}catch(e){}
           queueSolarTimes(solar);
         } else {
           // A missing forecast must not replace a previously valid same-day reading.
@@ -509,17 +563,49 @@ function startWeatherPlugin() {
       onError:function(error) {
         console.log('Next Up Agenda: Optional Weather source unavailable: '+(error && error.message || error));
       }
-    });
+    };
+    if (source!=='auto') request.plugin=source;
+    weatherSubscription=Pebble.subscribeToSource(request);
   } catch(err) {
     console.log('Next Up Agenda: Weather subscription unavailable; Auto uses clock fallback: '+err);
   }
 }
 function restoreSolarTimes() {
   try {
-    var solar=JSON.parse(localStorage.getItem('hybrid_solar_cache')||'null');
+    var solar=JSON.parse(localStorage.getItem(weatherCacheKey('hybrid_solar_cache'))||'null');
     if (solar && sameLocalDay(Number(solar.sunrise),Math.floor(Date.now()/1000)))
       queueSolarTimes(solar);
   }catch(e){}
+}
+
+function configureWeatherSource() {
+  var source=selectedWeatherSource(),generation=++weatherSourceGeneration;
+  if (weatherSubscription && typeof weatherSubscription.unsubscribe==='function')
+    weatherSubscription.unsubscribe();
+  weatherSubscription=null;
+  clearTimeout(forecastTimer);forecastTimer=null;
+  clearTimeout(solarRetryTimer);solarRetryTimer=null;
+  clearTimeout(weatherSourceTimer);weatherSourceTimer=null;
+  forecastPending=null;forecastLastSent='';
+  pendingSolar=null;lastSolarSent='';
+  weatherSourcePending=true;
+  function sendSource() {
+    if (generation!==weatherSourceGeneration) return;
+    Pebble.sendAppMessage({WEATHER_SOURCE:source},function(){
+      if (generation!==weatherSourceGeneration) return;
+      weatherSourcePending=false;
+      deliverForecast();
+      deliverSolarTimes();
+    },function(){
+      if (generation===weatherSourceGeneration)
+        weatherSourceTimer=setTimeout(sendSource,2500);
+    });
+  }
+  sendSource();
+  if (source==='none') return;
+  restoreSolarTimes();
+  restoreForecast();
+  startWeatherPlugin();
 }
 
 function stopPluginCalendar() {
@@ -684,9 +770,7 @@ Pebble.addEventListener('ready', function() {
   removeLegacyIcsSettings();
   detailCacheRestored=restoreDetailCache();
   startPluginCalendar();
-  restoreSolarTimes();
-  restoreForecast();
-  startWeatherPlugin();
+  configureWeatherSource();
 });
 
 // Fired when the watch specifically asks the phone for help (The "Help Signal")
@@ -723,8 +807,11 @@ Pebble.addEventListener('appmessage', function(e) {
     forceNextPluginSync=true;
     lastSolarSent='';
     forecastLastSent='';
-    restoreSolarTimes();
-    restoreForecast();
+    if (selectedWeatherSource()!=='none') {
+      restoreSolarTimes();
+      restoreForecast();
+      startWeatherPlugin();
+    }
     stopPluginCalendar();
     startPluginCalendar();
   } else if (payload.SYNC_COMMAND === 'sync') {
@@ -753,6 +840,15 @@ function knownCalendarNames() {
 }
 function buildAgendaClayConfig() {
   var cfg=JSON.parse(JSON.stringify(clayConfig));
+  var weather=cfg[cfg.length-2].items[1];
+  var choices=weatherPluginChoices();
+  if (!choices.some(function(choice){return choice.value===WEATHER_PLUS_UUID;}))
+    choices.push({label:'Weather+ (install plugin)',value:WEATHER_PLUS_UUID});
+  var source=selectedWeatherSource();
+  if (source!=='auto' && source!=='none' &&
+      !choices.some(function(choice){return choice.value===source;}))
+    choices.push({label:'Saved Weather Plugin (unavailable)',value:source});
+  weather.options.splice.apply(weather.options,[1,0].concat(choices));
   var names=knownCalendarNames();
   if (!names.length) return cfg;
   var items=[{type:'heading',defaultValue:'Native Calendar Colors'}];
@@ -781,6 +877,7 @@ Pebble.addEventListener('showConfiguration', function() {
     if (value !== null) prefs[key]=value;
   });
   prefs.PLUGIN_COLOR=String(pluginColor());
+  prefs.WEATHER_SOURCE=selectedWeatherSource();
   var names=knownCalendarNames();
   names.forEach(function(name,i){
     prefs['PLUGIN_CALENDAR_COLOR_'+(i+1)]=String(colorForCalendar(name));
@@ -796,6 +893,14 @@ Pebble.addEventListener('webviewclosed', function(e) {
   var dict;
   try { dict = clay.getSettings(e.response); }
   catch (err) { console.log('JS: Invalid settings response'); return; }
+
+  var weatherSource=dict[messageKeys.WEATHER_SOURCE];
+  if (typeof weatherSource==='string' && weatherSource!==selectedWeatherSource() &&
+      (weatherSource==='auto' || weatherSource==='none' ||
+        /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(weatherSource))) {
+    localStorage.setItem('agenda_weather_source',weatherSource);
+    configureWeatherSource();
+  }
 
   var oldPluginColor=pluginColor();
   var currentColors=calendarColorMap(),changedIndividualColors=false;
