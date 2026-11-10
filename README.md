@@ -5,7 +5,7 @@ A quick-glance calendar and daily weather agenda for Pebble watches. Calendar ev
 ## Features
 
 - Native Calendar plugin: upcoming appointments from calendars enabled in the Pebble mobile app, sorted by date
-- Native Weather plugin: weather glyph and high/low temperatures in the agenda's date headers
+- Optional weather plugin: weather glyph and high/low temperatures in the agenda's date headers
 - Automatic light/dark theme based on today's sunrise and sunset; 7 AM–7 PM fallback if solar data is unavailable
 - Color choices for each discovered calendar and a default calendar color
 - All-day event support, duplicate-event filtering that preserves recurring appointments, 12/24-hour time, compact event rows and adjustable text size
@@ -19,7 +19,7 @@ A quick-glance calendar and daily weather agenda for Pebble watches. Calendar ev
 
 1. Install [next-up-agenda.pbw](https://github.com/ericlmccormick/Next-Up-Agenda/releases/download/v1.0.0/next-up-agenda.pbw) and enable the **Calendar** plugin in the Pebble mobile app.
 2. Allow calendar access and choose which device calendars the plugin can read.
-3. Enable the **Weather** plugin if you want daily high/low temperatures, condition icons, or sunrise/sunset theme switching.
+3. In the phone settings under **Weather**, use **Pebble Preferred Source**, choose an installed weather plugin such as **Weather+**, or select **No Weather**. The selected plugin must provide daily forecasts and solar times for those features to appear.
 4. Open the app's phone settings to choose default/per-calendar colors and display preferences. Long-press Select on the watch for Force Sync and watch-side settings.
 
 Without Calendar plugin data, the watch preserves its last valid agenda instead of erasing it on an unavailable-source error. Badly shaped plugin responses also cannot erase valid cached events. A valid empty Calendar response clears out old events. Without the Weather plugin the calendar works normally, without daily forecasts, and Auto appearance uses the fallback times.

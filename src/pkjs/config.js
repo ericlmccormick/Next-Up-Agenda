@@ -150,6 +150,23 @@ module.exports = [
     ]
   },
   {
+    "type": "section",
+    "items": [
+      { "type": "heading", "defaultValue": "Weather" },
+      {
+        "type": "select",
+        "messageKey": "WEATHER_SOURCE",
+        "label": "Weather Source",
+        "description": "Controls forecasts and sunrise/sunset for Auto appearance. No Weather uses local clock times.",
+        "defaultValue": "auto",
+        "options": [
+          { "label": "Pebble Preferred Source (default)", "value": "auto" },
+          { "label": "No Weather", "value": "none" }
+        ]
+      }
+    ]
+  },
+  {
     "type": "submit",
     "defaultValue": "Save Settings"
   }

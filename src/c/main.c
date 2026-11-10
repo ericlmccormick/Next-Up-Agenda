@@ -20,6 +20,7 @@
 #define PERSIST_KEY_SUNRISE 90
 #define PERSIST_KEY_SUNSET 91
 #define PERSIST_KEY_WEATHER 89
+#define PERSIST_KEY_WEATHER_SOURCE 88
 #define FORECAST_RECORD_SIZE 7
 #define FORECAST_MAX_DAYS 7
 // Define the storage key used to save the total number of events
@@ -850,6 +851,24 @@ static void inbox_handler(DictionaryIterator *iter, void *ctx) {
       text_layer_set_text(s_toast_layer, "Sync failed (cached)");
       layer_set_hidden(text_layer_get_layer(s_toast_layer), false);
       menu_layer_reload_data(s_menu_layer);
+    }
+    return;
+  }
+  Tuple *source=dict_find(iter, MESSAGE_KEY_WEATHER_SOURCE);
+  if (source && source->type == TUPLE_CSTRING && source->length <= 37) {
+    char previous[37] = "auto";
+    if (persist_exists(PERSIST_KEY_WEATHER_SOURCE))
+      persist_read_string(PERSIST_KEY_WEATHER_SOURCE, previous, sizeof(previous));
+    const char *selected=source->value->cstring;
+    if (strcmp(previous, selected) != 0) {
+      s_forecast_count=0;
+      s_sunrise=s_sunset=0;
+      persist_delete(PERSIST_KEY_WEATHER);
+      persist_delete(PERSIST_KEY_SUNRISE);
+      persist_delete(PERSIST_KEY_SUNSET);
+      persist_write_string(PERSIST_KEY_WEATHER_SOURCE, selected);
+      apply_main_theme();
+      if (s_menu_layer) menu_layer_reload_data(s_menu_layer);
     }
     return;
   }
