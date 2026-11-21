@@ -11,7 +11,7 @@ function Clay(){this.setSettings=()=>{};this.getSettings=()=>({});this.generateU
 const Pebble={addEventListener:(name,fn)=>handlers[name]=fn,
 subscribeToSource:options=>{subs.push(options);return {unsubscribe:()=>{}};},
 getActiveWatchInfo:()=>({platform:'emery'}),
-sendAppMessage:(msg,success)=>{sent.push(msg);if(success)success();},
+sendAppMessage:(msg,success)=>{if (msg.WEATHER_SOURCE===undefined) sent.push(msg);if(success)success();},
 openURL:()=>{}};
 const ctx={require:name=>name==='pebble-clay'?Clay:name==='message_keys'?{}:[],
 Pebble,localStorage:storage,

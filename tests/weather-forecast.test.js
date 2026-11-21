@@ -61,4 +61,10 @@ assert.equal(result[0].icon,7);
 assert.equal(result[0].low,-2);
 const raw=ctx.packForecast(result);
 assert.equal(new DataView(Uint8Array.from(raw).buffer).getInt8(5),-2);
+const kelvin={instances:[{properties:{
+  daily_high:series('numericValue',[293.15],'K'),
+  daily_low:series('numericValue',[283.15],'K'),
+  daily_condition_code:series('longText',['sun'])
+}}]};
+assert.deepEqual(Array.from(ctx.forecastFromEnvelope(kelvin),x=>[x.high,x.low]),[[20,10]]);
 console.log('Native Weather daily forecasts, labels, icons and serialization tests passed');
