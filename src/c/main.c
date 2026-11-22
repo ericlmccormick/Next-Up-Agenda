@@ -394,7 +394,8 @@ static void detail_load(Window *window) {
   scroll_layer_add_child(s_detail_scroll_layer, text_layer_get_layer(s_detail_time_layer));
   s_detail_title_layer = text_layer_create(GRect(0, 0, bounds.size.w, 48));
   text_layer_set_font(s_detail_title_layer, fonts_get_system_font(
-    font == 3 ? FONT_KEY_GOTHIC_28_BOLD : FONT_KEY_GOTHIC_24_BOLD));
+    font == 3 ? FONT_KEY_GOTHIC_28_BOLD :
+    font == 1 ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_24_BOLD));
   text_layer_set_text_color(s_detail_title_layer, ui_foreground());
   text_layer_set_background_color(s_detail_title_layer, GColorClear);
   scroll_layer_add_child(s_detail_scroll_layer, text_layer_get_layer(s_detail_title_layer));
@@ -662,6 +663,27 @@ static void request_calendar_sync(bool force) {
 static uint16_t settings_rows(MenuLayer *menu, uint16_t section, void *data) {
   return SETTINGS_COUNT;
 }
+static void apply_font_mode(int mode) {
+  s_font_mode = mode;
+  persist_write_int(PERSIST_KEY_FONT_SIZE, mode);
+  if (s_menu_layer) menu_layer_reload_data(s_menu_layer);
+  if (s_settings_menu) menu_layer_reload_data(s_settings_menu);
+  if (s_detail_meta_layer) {
+    int effective = effective_font_mode();
+    text_layer_set_font(s_detail_title_layer, fonts_get_system_font(
+      effective == 3 ? FONT_KEY_GOTHIC_28_BOLD :
+      effective == 1 ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_24_BOLD));
+    text_layer_set_font(s_detail_meta_layer, fonts_get_system_font(
+      effective == 3 ? FONT_KEY_GOTHIC_28 :
+      effective == 1 ? FONT_KEY_GOTHIC_18 : FONT_KEY_GOTHIC_24));
+    layout_detail_content();
+  }
+}
+
+static int16_t settings_row_height(MenuLayer *menu, MenuIndex *index, void *data) {
+  return index->row == SETTING_FONT ? 64 : 44;
+}
+
 static void settings_draw(GContext *ctx, const Layer *layer, MenuIndex *index, void *data) {
   static char last[40];
   const char *title = "", *subtitle = "";
@@ -692,6 +714,22 @@ static void settings_draw(GContext *ctx, const Layer *layer, MenuIndex *index, v
         subtitle=last;
       }
       break;
+  }
+  if (index->row == SETTING_FONT) {
+    bool selected = menu_cell_layer_is_highlighted(layer);
+    graphics_context_set_text_color(ctx, selected
+      ? (dark_mode() ? GColorBlack : PBL_IF_COLOR_ELSE(GColorBlack, GColorWhite))
+      : ui_foreground());
+    GRect bounds = layer_get_bounds(layer);
+    char label[36];
+    snprintf(label, sizeof(label), "Text size: %s", subtitle);
+    graphics_draw_text(ctx, label, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD),
+                       GRect(8, 1, bounds.size.w - 16, 20), GTextOverflowModeTrailingEllipsis,
+                       GTextAlignmentLeft, NULL);
+    graphics_draw_text(ctx, "Sample event", fonts_get_system_font(event_font()),
+                       GRect(8, 21, bounds.size.w - 16, 40), GTextOverflowModeTrailingEllipsis,
+                       GTextAlignmentLeft, NULL);
+    return;
   }
   menu_cell_basic_draw(ctx, layer, title, subtitle, NULL);
 }
@@ -733,9 +771,7 @@ static void settings_select(MenuLayer *menu, MenuIndex *index, void *data) {
       apply_main_theme();
       break;
     case SETTING_FONT:
-      s_font_mode = (s_font_mode + 1) % 4;
-      persist_write_int(PERSIST_KEY_FONT_SIZE, s_font_mode);
-      menu_layer_reload_data(s_menu_layer);
+      apply_font_mode((s_font_mode + 1) % 4);
       break;
     case SETTING_PAST:
       s_show_past = !s_show_past;
@@ -764,7 +800,7 @@ static void settings_load(Window *window) {
   Layer *root=window_get_root_layer(window);
   s_settings_menu=menu_layer_create(agenda_viewport(layer_get_bounds(root)));
   menu_layer_set_callbacks(s_settings_menu, NULL, (MenuLayerCallbacks){
-    .get_num_rows=settings_rows, .draw_row=settings_draw,
+    .get_num_rows=settings_rows, .get_cell_height=settings_row_height, .draw_row=settings_draw,
     .select_click=settings_select
   });
   menu_layer_set_click_config_onto_window(s_settings_menu, window);
@@ -912,9 +948,7 @@ static void inbox_handler(DictionaryIterator *iter, void *ctx) {
   if (font && font->type == TUPLE_CSTRING) {
     int value=atoi(font->value->cstring);
     if (value >= 0 && value <= 3) {
-      s_font_mode=value;
-      persist_write_int(PERSIST_KEY_FONT_SIZE, value);
-      menu_layer_reload_data(s_menu_layer);
+      apply_font_mode(value);
     }
   }
   Tuple *theme=dict_find(iter, MESSAGE_KEY_THEME_MODE);
