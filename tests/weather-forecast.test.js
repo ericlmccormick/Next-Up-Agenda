@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const src=fs.readFileSync('src/pkjs/index.js','utf8');
 const start=src.indexOf('var forecastPending=null;');
-const end=src.indexOf('// Optional native Weather plugin: sunrise/sunset',start);
+const end=src.indexOf('// Appearance is independent',start);
 assert(start>=0 && end>start,'daily forecast adapter present');
 const sent=[],ctx={
   console:{log:()=>{}},Date,Number,Math,JSON,Array,Uint8Array,DataView,

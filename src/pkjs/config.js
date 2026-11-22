@@ -58,15 +58,15 @@ module.exports = [
         "label": "Appearance",
         "options": [
           {
-            "label": "Auto (day/night)",
+            "label": "Auto",
             "value": "0"
           },
           {
-            "label": "Light",
+            "label": "Day",
             "value": "1"
           },
           {
-            "label": "Dark",
+            "label": "Night",
             "value": "2"
           }
         ]
@@ -157,7 +157,7 @@ module.exports = [
         "type": "select",
         "messageKey": "WEATHER_SOURCE",
         "label": "Weather Source",
-        "description": "Controls forecasts and sunrise/sunset for Auto appearance. No Weather uses local clock times.",
+        "description": "Controls forecasts. Auto appearance uses Weather+ or Pebble Weather.",
         "defaultValue": "auto",
         "options": [
           { "label": "Pebble Preferred Source (default)", "value": "auto" },

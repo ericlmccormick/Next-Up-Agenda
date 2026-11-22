@@ -24,7 +24,7 @@ function harness(noPlugin) {
   };
   const storage={getItem:k=>Object.prototype.hasOwnProperty.call(data,k)?data[k]:null,
     setItem:(k,v)=>data[k]=String(v),removeItem:k=>delete data[k]};
-  const scope={require:n=>n==='pebble-clay'?Clay:n==='message_keys'?{}:[],
+  const scope={require:n=>n==='pebble-clay'?Clay:n==='message_keys'?{}:n==='./theme-weather'?require('../src/pkjs/theme-weather'):[],
     Pebble,localStorage:storage,
     setTimeout:(fn,delay)=>{let key=++id;timers.set(key,{fn,delay});return key;},
     clearTimeout:key=>timers.delete(key),console};
@@ -69,13 +69,13 @@ assert.equal(h.subs.filter(x=>x.category==='calendar').length,2);
 assert.equal(h.unsubs,1);
 h.subs[0].onData({instances:[]}); // stale result from unsubscribed source
 assert.equal(h.messages('TOTAL_EVENTS').length,initialCount);
-h.subs[2].onData({instances:[event]});
+h.subs.filter(x=>x.category==='calendar')[1].onData({instances:[event]});
 h.fire(750);
 assert.equal(h.messages('TOTAL_EVENTS').length,initialCount+1,
   'Force Sync must resend unchanged appointments and finish watchdog on watch');
 assert.equal(JSON.parse(h.data.detail_cache_events).length,1);
 // A properly formed empty response is different from a schema error.
-h.subs[2].onData({instances:[]});
+h.subs.filter(x=>x.category==='calendar')[1].onData({instances:[]});
 h.fire(750);
 assert.equal(JSON.parse(h.data.detail_cache_events).length,0);
 assert.equal(h.messages('TOTAL_EVENTS').at(-1).TOTAL_EVENTS,0);

@@ -13,7 +13,7 @@ subscribeToSource:options=>{subs.push(options);return {unsubscribe:()=>{}};},
 getActiveWatchInfo:()=>({platform:'emery'}),
 sendAppMessage:(msg,success)=>{if (msg.WEATHER_SOURCE===undefined) sent.push(msg);if(success)success();},
 openURL:()=>{}};
-const ctx={require:name=>name==='pebble-clay'?Clay:name==='message_keys'?{}:[],
+const ctx={require:name=>name==='pebble-clay'?Clay:name==='message_keys'?{}:name==='./theme-weather'?require('../src/pkjs/theme-weather'):[],
 Pebble,localStorage:storage,
 setTimeout:(fn,ms)=>{const id=++timerId;timers.set(id,{fn,ms});return id;},
 clearTimeout:id=>timers.delete(id),console};

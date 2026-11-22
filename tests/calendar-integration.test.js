@@ -29,7 +29,7 @@ function scenario(previousIcs) {
   },
   getActiveWatchInfo:()=>({platform:'emery'}),openURL:()=>{}
  };
- const ctx={require:name=>name==='pebble-clay'?Clay:name==='message_keys'?{}:[],
+ const ctx={require:name=>name==='pebble-clay'?Clay:name==='message_keys'?{}:name==='./theme-weather'?require('../src/pkjs/theme-weather'):[],
   Pebble:pebble,localStorage:storage,XMLHttpRequest:LegacyRequest,
   setTimeout:(fn,ms)=>{let id=++nextId;timers.set(id,{fn,ms});return id;},
   clearTimeout:id=>timers.delete(id),console};
@@ -40,7 +40,7 @@ function scenario(previousIcs) {
   timers.delete(entry[0]);entry[1].fn();
  }
  handlers.ready();
- assert.equal(subs.length,2,'Calendar and Weather plugin subscriptions');
+ assert.equal(subs.length,3,'Calendar, forecast, and solar subscriptions');
  assert.equal(subs[0].category,'calendar');
  assert.equal(subs[1].category,'weather');
  assert.equal(requests,0);

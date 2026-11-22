@@ -471,58 +471,15 @@ function restoreForecast() {
     }
   } catch(e){}
 }
-// Optional native Weather plugin: sunrise/sunset are local-date-specific,
-// supplied in UTC epoch seconds, without querying an external weather API.
-// We use the first saved weather location with valid solar data.
-var weatherSubscription=null;
-var pendingSolar=null;
-var solarRetryTimer=null;
-var lastSolarSent='';
-function sameLocalDay(a,b) {
-  var x=new Date(a*1000),y=new Date(b*1000);
-  return x.getFullYear()===y.getFullYear() &&
-    x.getMonth()===y.getMonth() && x.getDate()===y.getDate();
+// Appearance is independent of the selected forecast source.
+var weatherTheme;
+var weatherSubscription = null;
+function updateSolarTheme() {
+  if (!weatherTheme) weatherTheme = require('./theme-weather').create(Pebble, messageKeys);
+  var mode = localStorage.getItem('watch_pref_THEME_MODE') || '0';
+  weatherTheme.setAuto(mode === '0');
 }
-function solarFromEnvelope(envelope) {
-  var instances=envelope && Array.isArray(envelope.instances)?envelope.instances:[];
-  var now=Math.floor(Date.now()/1000);
-  for (var i=0;i<instances.length;i++) {
-    var props=instances[i] && instances[i].properties || {};
-    var sunrise=Number(props.sunrise && props.sunrise.timestamp && props.sunrise.timestamp.value);
-    var sunset=Number(props.sunset && props.sunset.timestamp && props.sunset.timestamp.value);
-    if (isFinite(sunrise) && isFinite(sunset) && sunrise>0 &&
-        sunset>sunrise && sunset-sunrise<86400 && sameLocalDay(sunrise,now)) {
-      return {sunrise:sunrise,sunset:sunset};
-    }
-  }
-  return null;
-}
-function deliverSolarTimes() {
-  if (!pendingSolar || weatherSourcePending || activeTransfer || syncBusy) {
-    if (pendingSolar && !solarRetryTimer)
-      solarRetryTimer=setTimeout(function(){solarRetryTimer=null;deliverSolarTimes();},1000);
-    return;
-  }
-  var solar=pendingSolar,key=solar.sunrise+':'+solar.sunset,generation=weatherSourceGeneration;
-  if (lastSolarSent===key) {pendingSolar=null;return;}
-  Pebble.sendAppMessage({SUNRISE_TIME:solar.sunrise,SUNSET_TIME:solar.sunset},
-    function() {
-      if(generation!==weatherSourceGeneration) return;
-      lastSolarSent=key;
-      if(pendingSolar===solar) pendingSolar=null;
-    },
-    function() {
-      // A short companion AppMessage collision must not affect calendar sync.
-      if (generation===weatherSourceGeneration && !solarRetryTimer) solarRetryTimer=setTimeout(function(){
-        solarRetryTimer=null;deliverSolarTimes();
-      },3000);
-    });
-}
-function queueSolarTimes(solar) {
-  if (!solar) return;
-  pendingSolar=solar;
-  deliverSolarTimes();
-}
+
 function startWeatherPlugin() {
   var source=selectedWeatherSource(),generation=weatherSourceGeneration;
   if (source==='none') return;
@@ -551,14 +508,6 @@ function startWeatherPlugin() {
           try {localStorage.setItem(weatherCacheKey('hybrid_forecast_cache'),JSON.stringify({savedAt:Date.now(),items:forecast}));}catch(e){}
           queueForecast(forecast);
         }
-        var solar=solarFromEnvelope(envelope);
-        if (solar) {
-          try {localStorage.setItem(weatherCacheKey('hybrid_solar_cache'),JSON.stringify(solar));}catch(e){}
-          queueSolarTimes(solar);
-        } else {
-          // A missing forecast must not replace a previously valid same-day reading.
-          console.log('Next Up Agenda: Weather plugin has no current-day solar times; clock fallback applies');
-        }
       },
       onError:function(error) {
         console.log('Next Up Agenda: Optional Weather source unavailable: '+(error && error.message || error));
@@ -570,24 +519,14 @@ function startWeatherPlugin() {
     console.log('Next Up Agenda: Weather subscription unavailable; Auto uses clock fallback: '+err);
   }
 }
-function restoreSolarTimes() {
-  try {
-    var solar=JSON.parse(localStorage.getItem(weatherCacheKey('hybrid_solar_cache'))||'null');
-    if (solar && sameLocalDay(Number(solar.sunrise),Math.floor(Date.now()/1000)))
-      queueSolarTimes(solar);
-  }catch(e){}
-}
-
 function configureWeatherSource() {
   var source=selectedWeatherSource(),generation=++weatherSourceGeneration;
   if (weatherSubscription && typeof weatherSubscription.unsubscribe==='function')
     weatherSubscription.unsubscribe();
   weatherSubscription=null;
   clearTimeout(forecastTimer);forecastTimer=null;
-  clearTimeout(solarRetryTimer);solarRetryTimer=null;
   clearTimeout(weatherSourceTimer);weatherSourceTimer=null;
   forecastPending=null;forecastLastSent='';
-  pendingSolar=null;lastSolarSent='';
   weatherSourcePending=true;
   function sendSource() {
     if (generation!==weatherSourceGeneration) return;
@@ -595,7 +534,6 @@ function configureWeatherSource() {
       if (generation!==weatherSourceGeneration) return;
       weatherSourcePending=false;
       deliverForecast();
-      deliverSolarTimes();
     },function(){
       if (generation===weatherSourceGeneration)
         weatherSourceTimer=setTimeout(sendSource,2500);
@@ -603,7 +541,6 @@ function configureWeatherSource() {
   }
   sendSource();
   if (source==='none') return;
-  restoreSolarTimes();
   restoreForecast();
   startWeatherPlugin();
 }
@@ -771,6 +708,7 @@ Pebble.addEventListener('ready', function() {
   detailCacheRestored=restoreDetailCache();
   startPluginCalendar();
   configureWeatherSource();
+  updateSolarTheme();
 });
 
 // Fired when the watch specifically asks the phone for help (The "Help Signal")
@@ -797,6 +735,7 @@ Pebble.addEventListener('appmessage', function(e) {
       if (payload[key] !== undefined) {
         settings[key]=String(payload[key]);
         localStorage.setItem('watch_pref_'+key,settings[key]);
+        if (key === 'THEME_MODE') updateSolarTheme();
       }
     }
     clay.setSettings(settings);
@@ -805,10 +744,8 @@ Pebble.addEventListener('appmessage', function(e) {
   if (payload.SYNC_COMMAND === 'refresh') {
     console.log('Agenda: Manual refresh');
     forceNextPluginSync=true;
-    lastSolarSent='';
     forecastLastSent='';
     if (selectedWeatherSource()!=='none') {
-      restoreSolarTimes();
       restoreForecast();
       startWeatherPlugin();
     }
@@ -922,6 +859,7 @@ Pebble.addEventListener('webviewclosed', function(e) {
     if (dict[messageKeys[key]] !== undefined) {
       watchPrefs[key] = String(dict[messageKeys[key]]);
       localStorage.setItem('watch_pref_'+key, watchPrefs[key]);
+      if (key === 'THEME_MODE') updateSolarTheme();
     }
   });
   if (Object.keys(watchPrefs).length) {

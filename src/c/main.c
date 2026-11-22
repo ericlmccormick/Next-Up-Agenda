@@ -1,5 +1,6 @@
 // Include the standard Pebble SDK library for watchface and app development
 #include <pebble.h>
+#include "solar_theme.h"
 
 // --- Configuration Constants ---
 // Up to 55 UTF-8 bytes plus a null terminator.
@@ -102,7 +103,6 @@ static CalendarSection s_sections[MAX_SECTIONS];
 static int s_visible_indices[MAX_EVENTS];
 static int s_visible_count = 0;
 static int s_theme = 0; // 0=Auto day/night, 1=Light, 2=Dark
-static time_t s_sunrise = 0, s_sunset = 0;
 static bool s_show_past = false;
 static bool s_show_status_bar = false;
 static int s_time_mode = 0; // 0=System, 1=12h, 2=24h
@@ -197,24 +197,9 @@ static void update_sections(void) {
     s_sections[s_num_sections - 1].count++;
   }
 }
-// In Auto, use today's weather-plugin sunrise and sunset if available.
-// Never use yesterday's solar times: they are invalid after local midnight.
-static bool solar_times_valid(time_t now) {
-  if (s_sunrise <= 0 || s_sunset <= s_sunrise) return false;
-  if (s_sunset - s_sunrise > 24 * 60 * 60) return false;
-  struct tm sunrise_day = *localtime(&s_sunrise);
-  struct tm now_day = *localtime(&now);
-  return sunrise_day.tm_year == now_day.tm_year &&
-         sunrise_day.tm_yday == now_day.tm_yday;
-}
 static bool dark_mode(void) {
-  if (s_theme == 1) return false;
-  if (s_theme == 2) return true;
-  time_t now = time(NULL);
-  if (solar_times_valid(now)) return now < s_sunrise || now >= s_sunset;
-  // No Weather plugin, denied Location access, or stale forecast.
-  struct tm *t = localtime(&now);
-  return t && (t->tm_hour < 7 || t->tm_hour >= 19);
+  return solar_theme_dark(s_theme == 1 ? VG_THEME_DAY :
+                          s_theme == 2 ? VG_THEME_NIGHT : VG_THEME_AUTO);
 }
 static GColor ui_background(void) { return dark_mode() ? GColorBlack : GColorWhite; }
 static GColor ui_foreground(void) { return dark_mode() ? GColorWhite : GColorBlack; }
@@ -684,7 +669,7 @@ static void settings_draw(GContext *ctx, const Layer *layer, MenuIndex *index, v
     case SETTING_SYNC: title="Force Sync"; subtitle="Fetch calendar now"; break;
     case SETTING_THEME:
       title="Appearance";
-      subtitle=s_theme==1 ? "Light" : s_theme==2 ? "Dark" : "Auto (day/night)";
+      subtitle=s_theme==1 ? "Day" : s_theme==2 ? "Night" : "Auto";
       break;
     case SETTING_FONT:
       title="Font Size";
@@ -861,6 +846,7 @@ static void finish_calendar_sync(CalendarEvent *incoming, int total, uint32_t id
   if (s_settings_menu) menu_layer_reload_data(s_settings_menu);
 }
 static void inbox_handler(DictionaryIterator *iter, void *ctx) {
+  if (solar_theme_receive(iter)) { apply_main_theme(); return; }
   Tuple *detail=dict_find(iter, MESSAGE_KEY_DETAIL_TEXT);
   if (detail && detail->type == TUPLE_CSTRING) {
     Tuple *token=dict_find(iter, MESSAGE_KEY_DETAIL_TOKEN);
@@ -893,10 +879,7 @@ static void inbox_handler(DictionaryIterator *iter, void *ctx) {
     const char *selected=source->value->cstring;
     if (strcmp(previous, selected) != 0) {
       s_forecast_count=0;
-      s_sunrise=s_sunset=0;
       persist_delete(PERSIST_KEY_WEATHER);
-      persist_delete(PERSIST_KEY_SUNRISE);
-      persist_delete(PERSIST_KEY_SUNSET);
       persist_write_string(PERSIST_KEY_WEATHER_SOURCE, selected);
       apply_main_theme();
       if (s_menu_layer) menu_layer_reload_data(s_menu_layer);
@@ -922,22 +905,6 @@ static void inbox_handler(DictionaryIterator *iter, void *ctx) {
         persist_write_data(PERSIST_KEY_WEATHER,encoded,n*FORECAST_RECORD_SIZE);
       }
       if (s_menu_layer) menu_layer_reload_data(s_menu_layer);
-    }
-    return;
-  }
-  Tuple *rise=dict_find(iter, MESSAGE_KEY_SUNRISE_TIME);
-  Tuple *set=dict_find(iter, MESSAGE_KEY_SUNSET_TIME);
-  if (rise && set) {
-    time_t sunrise=(time_t)rise->value->int32;
-    time_t sunset=(time_t)set->value->int32;
-    // A zero/zero update explicitly disables outdated solar values.
-    if ((sunrise == 0 && sunset == 0) ||
-        (sunrise > 0 && sunset > sunrise && sunset-sunrise < 24*60*60)) {
-      s_sunrise=sunrise;
-      s_sunset=sunset;
-      persist_write_int(PERSIST_KEY_SUNRISE,(int)sunrise);
-      persist_write_int(PERSIST_KEY_SUNSET,(int)sunset);
-      apply_main_theme();
     }
     return;
   }
@@ -1111,6 +1078,7 @@ static void main_unload(Window *window) {
 
 // The initialization function that runs immediately when the app opens
 static void init() {
+  solar_theme_load();
   s_main_window = window_create(); // Create main window
   // Assign the load and unload handlers to the window
   window_set_window_handlers(s_main_window, (WindowHandlers) {
@@ -1126,8 +1094,6 @@ static void init() {
   // New launches always start at the beginning, not the last opened event.
   s_restore_event_index = 0;
   if (persist_exists(PERSIST_KEY_THEME)) s_theme = persist_read_int(PERSIST_KEY_THEME);
-  if (persist_exists(PERSIST_KEY_SUNRISE)) s_sunrise=(time_t)persist_read_int(PERSIST_KEY_SUNRISE);
-  if (persist_exists(PERSIST_KEY_SUNSET)) s_sunset=(time_t)persist_read_int(PERSIST_KEY_SUNSET);
   if (persist_exists(PERSIST_KEY_SHOW_PAST)) s_show_past = persist_read_bool(PERSIST_KEY_SHOW_PAST);
   if (persist_exists(PERSIST_KEY_STATUS_BAR)) s_show_status_bar = persist_read_bool(PERSIST_KEY_STATUS_BAR);
   if (persist_exists(PERSIST_KEY_TIME_MODE)) s_time_mode = persist_read_int(PERSIST_KEY_TIME_MODE);
