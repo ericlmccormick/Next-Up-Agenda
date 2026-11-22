@@ -668,7 +668,7 @@ static void settings_draw(GContext *ctx, const Layer *layer, MenuIndex *index, v
   switch (index->row) {
     case SETTING_SYNC: title="Force Sync"; subtitle="Fetch calendar now"; break;
     case SETTING_THEME:
-      title="Appearance";
+      title="Theme";
       subtitle=s_theme==1 ? "Day" : s_theme==2 ? "Night" : "Auto";
       break;
     case SETTING_FONT:

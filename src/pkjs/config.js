@@ -3,6 +3,16 @@ module.exports = [
     "type": "heading",
     "defaultValue": "Calendar Settings"
   },
+  {type: 'section', items: [
+    {type: 'heading', defaultValue: 'Appearance'},
+    {type: 'select', messageKey: 'THEME_MODE', label: 'Theme', defaultValue: "0",
+      description: 'Auto follows sunrise and sunset. Without saved times, Day runs from 7 a.m. to 7 p.m.',
+      options: [
+        {label: 'Day', value: '1'},
+        {label: 'Night', value: '2'},
+        {label: 'Auto', value: '0'}
+      ]}
+  ]},
   {
     "type": "section",
     "items": [
@@ -50,26 +60,6 @@ module.exports = [
       {
         "type": "heading",
         "defaultValue": "Preferences"
-      },
-      {
-        "type": "select",
-        "messageKey": "THEME_MODE",
-        "defaultValue": "0",
-        "label": "Appearance",
-        "options": [
-          {
-            "label": "Auto",
-            "value": "0"
-          },
-          {
-            "label": "Day",
-            "value": "1"
-          },
-          {
-            "label": "Night",
-            "value": "2"
-          }
-        ]
       },
       {
         "type": "select",
